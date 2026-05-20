@@ -16,6 +16,9 @@
     "test": "npm run test:unit -- --run && npm run test:e2e",
     "test:e2e": "playwright install && playwright test"
   },
+  "dependencies": {
+    "@instantdb/svelte": "^1.0.38"
+  },
   "devDependencies": {
     "@eslint/compat": "^2.0.4",
     "@eslint/js": "^10.0.1",
