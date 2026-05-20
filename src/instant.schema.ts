@@ -4,6 +4,12 @@ import { i } from "@instantdb/svelte";
 
 const _schema = i.schema({
   entities: {
+    // Instant system entities
+    $users: i.entity({
+      email: i.string().unique().indexed().optional(),
+      imageURL: i.string().optional(),
+      type: i.string().optional(),
+    }),
     $files: i.entity({
       path: i.string().unique().indexed(),
       url: i.string(),
@@ -14,24 +20,30 @@ const _schema = i.schema({
       done: i.boolean().optional(),
       size: i.number().optional(),
     }),
-    $users: i.entity({
-      email: i.string().unique().indexed().optional(),
-      imageURL: i.string().optional(),
-      type: i.string().optional(),
+
+    // User account data
+    profiles: i.entity({
+      createdAt: i.date(),
+      name: i.string().optional(),
+      profileImageUrl: i.string().optional(),
+      updatedAt: i.date(),
     }),
-    characters: i.entity({
+
+    // Catalog hierarchy
+    publishers: i.entity({
       comicVineId: i.number().unique().indexed().optional(),
-      imageUrl: i.string().optional(),
       name: i.string().indexed(),
     }),
-    genres: i.entity({
-      name: i.string().unique().indexed(),
+    volumes: i.entity({
+      comicVineId: i.number().unique().indexed().optional(),
+      coverImageUrl: i.string().optional(),
+      dateLastSynced: i.date().optional(),
+      issueCount: i.number().optional(),
+      name: i.string().indexed(),
+      startYear: i.string().optional(),
+      status: i.string().optional(),
+      summary: i.string().optional(),
     }),
-    issueCharacters: i.entity({}),
-    issueCredits: i.entity({
-      role: i.string().indexed(),
-    }),
-    issueGenres: i.entity({}),
     issues: i.entity({
       comicVineId: i.number().unique().indexed().optional(),
       coverDate: i.date().optional(),
@@ -44,20 +56,29 @@ const _schema = i.schema({
       storeDate: i.date().optional(),
       summary: i.string().optional(),
     }),
+
+    // Catalog dimensions
     people: i.entity({
       comicVineId: i.number().unique().indexed().optional(),
       name: i.string().indexed(),
     }),
-    profiles: i.entity({
-      createdAt: i.date(),
-      name: i.string().optional(),
-      profileImageUrl: i.string().optional(),
-      updatedAt: i.date(),
-    }),
-    publishers: i.entity({
+    characters: i.entity({
       comicVineId: i.number().unique().indexed().optional(),
+      imageUrl: i.string().optional(),
       name: i.string().indexed(),
     }),
+    genres: i.entity({
+      name: i.string().unique().indexed(),
+    }),
+
+    // Issue join data
+    issueCredits: i.entity({
+      role: i.string().indexed(),
+    }),
+    issueCharacters: i.entity({}),
+    issueGenres: i.entity({}),
+
+    // User library
     userIssues: i.entity({
       acquiredAt: i.date().optional(),
       createdAt: i.date(),
@@ -69,41 +90,19 @@ const _schema = i.schema({
       userIssueKey: i.string().unique().indexed(),
       userNote: i.string().optional(),
     }),
-    userListItems: i.entity({
-      addedAt: i.date(),
-      listItemKey: i.string().unique().indexed(),
-      position: i.number().indexed(),
-    }),
     userLists: i.entity({
       createdAt: i.date(),
       name: i.string().indexed(),
       updatedAt: i.date(),
     }),
-    volumes: i.entity({
-      comicVineId: i.number().unique().indexed().optional(),
-      coverImageUrl: i.string().optional(),
-      dateLastSynced: i.date().optional(),
-      issueCount: i.number().optional(),
-      name: i.string().indexed(),
-      startYear: i.string().optional(),
-      status: i.string().optional(),
-      summary: i.string().optional(),
+    userListItems: i.entity({
+      addedAt: i.date(),
+      listItemKey: i.string().unique().indexed(),
+      position: i.number().indexed(),
     }),
   },
   links: {
-    $streams$files: {
-      forward: {
-        on: "$streams",
-        has: "many",
-        label: "$files",
-      },
-      reverse: {
-        on: "$files",
-        has: "one",
-        label: "$stream",
-        onDelete: "cascade",
-      },
-    },
+    // Instant system links
     $usersLinkedPrimaryUser: {
       forward: {
         on: "$users",
@@ -117,6 +116,21 @@ const _schema = i.schema({
         label: "linkedGuestUsers",
       },
     },
+    $streams$files: {
+      forward: {
+        on: "$streams",
+        has: "many",
+        label: "$files",
+      },
+      reverse: {
+        on: "$files",
+        has: "one",
+        label: "$stream",
+        onDelete: "cascade",
+      },
+    },
+
+    // User account links
     $usersProfile: {
       forward: {
         on: "$users",
@@ -131,56 +145,34 @@ const _schema = i.schema({
         onDelete: "cascade",
       },
     },
-    $usersUserIssues: {
+
+    // Catalog hierarchy links
+    publishersVolumes: {
       forward: {
-        on: "$users",
+        on: "publishers",
         has: "many",
-        label: "userIssues",
+        label: "volumes",
       },
       reverse: {
-        on: "userIssues",
+        on: "volumes",
         has: "one",
-        label: "owner",
-        onDelete: "cascade",
+        label: "publisher",
       },
     },
-    $usersUserLists: {
+    volumesIssues: {
       forward: {
-        on: "$users",
+        on: "volumes",
         has: "many",
-        label: "userLists",
+        label: "issues",
       },
       reverse: {
-        on: "userLists",
+        on: "issues",
         has: "one",
-        label: "owner",
-        onDelete: "cascade",
+        label: "volume",
       },
     },
-    charactersIssueCharacters: {
-      forward: {
-        on: "characters",
-        has: "many",
-        label: "issueCharacters",
-      },
-      reverse: {
-        on: "issueCharacters",
-        has: "one",
-        label: "character",
-      },
-    },
-    genresIssueGenres: {
-      forward: {
-        on: "genres",
-        has: "many",
-        label: "issueGenres",
-      },
-      reverse: {
-        on: "issueGenres",
-        has: "one",
-        label: "genre",
-      },
-    },
+
+    // Issue metadata links
     issuesCredits: {
       forward: {
         on: "issues",
@@ -192,6 +184,18 @@ const _schema = i.schema({
         has: "one",
         label: "issue",
         onDelete: "cascade",
+      },
+    },
+    peopleCredits: {
+      forward: {
+        on: "people",
+        has: "many",
+        label: "credits",
+      },
+      reverse: {
+        on: "issueCredits",
+        has: "one",
+        label: "person",
       },
     },
     issuesIssueCharacters: {
@@ -207,6 +211,18 @@ const _schema = i.schema({
         onDelete: "cascade",
       },
     },
+    charactersIssueCharacters: {
+      forward: {
+        on: "characters",
+        has: "many",
+        label: "issueCharacters",
+      },
+      reverse: {
+        on: "issueCharacters",
+        has: "one",
+        label: "character",
+      },
+    },
     issuesIssueGenres: {
       forward: {
         on: "issues",
@@ -217,6 +233,33 @@ const _schema = i.schema({
         on: "issueGenres",
         has: "one",
         label: "issue",
+        onDelete: "cascade",
+      },
+    },
+    genresIssueGenres: {
+      forward: {
+        on: "genres",
+        has: "many",
+        label: "issueGenres",
+      },
+      reverse: {
+        on: "issueGenres",
+        has: "one",
+        label: "genre",
+      },
+    },
+
+    // User library links
+    $usersUserIssues: {
+      forward: {
+        on: "$users",
+        has: "many",
+        label: "userIssues",
+      },
+      reverse: {
+        on: "userIssues",
+        has: "one",
+        label: "owner",
         onDelete: "cascade",
       },
     },
@@ -232,40 +275,16 @@ const _schema = i.schema({
         label: "issue",
       },
     },
-    peopleCredits: {
+    $usersUserLists: {
       forward: {
-        on: "people",
+        on: "$users",
         has: "many",
-        label: "credits",
+        label: "userLists",
       },
       reverse: {
-        on: "issueCredits",
+        on: "userLists",
         has: "one",
-        label: "person",
-      },
-    },
-    publishersVolumes: {
-      forward: {
-        on: "publishers",
-        has: "many",
-        label: "volumes",
-      },
-      reverse: {
-        on: "volumes",
-        has: "one",
-        label: "publisher",
-      },
-    },
-    userIssuesListItems: {
-      forward: {
-        on: "userIssues",
-        has: "many",
-        label: "listItems",
-      },
-      reverse: {
-        on: "userListItems",
-        has: "one",
-        label: "userIssue",
+        label: "owner",
         onDelete: "cascade",
       },
     },
@@ -282,16 +301,17 @@ const _schema = i.schema({
         onDelete: "cascade",
       },
     },
-    volumesIssues: {
+    userIssuesListItems: {
       forward: {
-        on: "volumes",
+        on: "userIssues",
         has: "many",
-        label: "issues",
+        label: "listItems",
       },
       reverse: {
-        on: "issues",
+        on: "userListItems",
         has: "one",
-        label: "volume",
+        label: "userIssue",
+        onDelete: "cascade",
       },
     },
   },
