@@ -1,6 +1,6 @@
-# sv
+# Longbox
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Longbox is a local-first PWA comic library designed to help collectors organize and rediscover their collection.
 
 ## Developing
 
