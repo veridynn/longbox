@@ -64,6 +64,21 @@ async function existingListItem(listItemKeyValue: string) {
   return data.userListItems[0] as { position?: number } | undefined;
 }
 
+async function existingUserIssue(userIssueKeyValue: string) {
+  const adminDb = getAdminDb();
+  const data = await adminDb.query({
+    userIssues: {
+      $: {
+        where: {
+          userIssueKey: userIssueKeyValue,
+        },
+      },
+    },
+  });
+
+  return data.userIssues[0] as { id?: string } | undefined;
+}
+
 export async function verifyInstantToken(token: string) {
   return getAdminDb().auth.verifyToken(token);
 }
@@ -73,6 +88,19 @@ export async function importComicVineIssue(
   issueComicVineId: number,
 ): Promise<ImportedIssue> {
   const adminDb = getAdminDb();
+  const inputUserIssueKey = userIssueKey(ownerId, issueComicVineId);
+  const inputListItemKey = listItemKey(ownerId, issueComicVineId);
+  const currentListItem = await existingListItem(inputListItemKey);
+
+  if (currentListItem) {
+    return {
+      issueId: String(issueComicVineId),
+      alreadyInLibrary: true,
+      userIssueKey: inputUserIssueKey,
+      listItemKey: inputListItemKey,
+    };
+  }
+
   const issue = await getComicVineIssue(issueComicVineId);
   const volume = issue.volume.id ? await getComicVineVolume(issue.volume.id) : null;
   const now = new Date();
@@ -82,9 +110,8 @@ export async function importComicVineIssue(
   const stableListItemKey = listItemKey(ownerId, issue.id);
   const stableListKey = listKey(ownerId);
   const stableListId = recordIdForKey(stableListKey);
-  const currentListItem = await existingListItem(stableListItemKey);
-  const alreadyInLibrary = Boolean(currentListItem);
-  const position = currentListItem?.position ?? (await nextLibraryPosition(ownerId));
+  const currentUserIssue = await existingUserIssue(stableUserIssueKey);
+  const position = await nextLibraryPosition(ownerId);
 
   const transactions: TransactionChunk<any, any>[] = [
     adminDb.tx.userLists[stableListId]
@@ -176,13 +203,20 @@ export async function importComicVineIssue(
 
   transactions.push(
     adminDb.tx.userIssues[lookup("userIssueKey", stableUserIssueKey)]
-      .update({
-        createdAt: now,
-        favorite: false,
-        owned: true,
-        readStatus: "unread",
-        updatedAt: now,
-      })
+      .update(
+        currentUserIssue
+          ? {
+              owned: true,
+              updatedAt: now,
+            }
+          : {
+              createdAt: now,
+              favorite: false,
+              owned: true,
+              readStatus: "unread",
+              updatedAt: now,
+            },
+      )
       .link({
         owner: ownerId,
         issue: lookup("comicVineId", issue.id),
@@ -202,7 +236,7 @@ export async function importComicVineIssue(
 
   return {
     issueId: String(issue.id),
-    alreadyInLibrary,
+    alreadyInLibrary: false,
     userIssueKey: stableUserIssueKey,
     listItemKey: stableListItemKey,
   };

@@ -1,5 +1,22 @@
-import { describe, expect, it } from "vitest";
-import { normalizeIssueDetail, normalizeSearchIssue, normalizeVolumeDetail } from "./comicvine";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("$env/dynamic/private", () => ({
+  env: {
+    COMIC_VINE_API_KEY: "test-key",
+  },
+}));
+
+import {
+  ComicVineError,
+  normalizeIssueDetail,
+  normalizeSearchIssue,
+  normalizeVolumeDetail,
+  searchComicVineIssues,
+} from "./comicvine";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("ComicVine normalization", () => {
   it("normalizes issue search results", () => {
@@ -81,5 +98,19 @@ describe("ComicVine normalization", () => {
       coverImageUrl: "https://img.example/volume.jpg",
       publisher: { id: 10, name: "DC Comics" },
     });
+  });
+
+  it("reports malformed ComicVine JSON as an upstream response error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
+      }),
+    );
+
+    await expect(searchComicVineIssues("batman")).rejects.toThrow(
+      new ComicVineError("ComicVine returned an invalid response."),
+    );
   });
 });

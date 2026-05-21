@@ -171,7 +171,15 @@ async function comicVineGet<T>(path: string, params: Record<string, string | num
     throw new ComicVineError(`ComicVine request failed with ${response.status}.`, 502);
   }
 
-  return ensureResults((await response.json()) as ComicVineResponse<T>);
+  try {
+    return ensureResults((await response.json()) as ComicVineResponse<T>);
+  } catch (error) {
+    if (error instanceof ComicVineError) {
+      throw error;
+    }
+
+    throw new ComicVineError("ComicVine returned an invalid response.");
+  }
 }
 
 export function normalizeSearchIssue(raw: Record<string, any>): ComicVineSearchIssue | null {
