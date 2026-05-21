@@ -17,6 +17,7 @@
     "test:e2e": "playwright install && playwright test"
   },
   "dependencies": {
+    "@instantdb/admin": "^1.0.38",
     "@instantdb/svelte": "^1.0.38"
   },
   "devDependencies": {

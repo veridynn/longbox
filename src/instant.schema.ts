@@ -73,9 +73,12 @@ const _schema = i.schema({
 
     // Issue join data
     issueCredits: i.entity({
+      creditKey: i.string().unique().indexed(),
       role: i.string().indexed(),
     }),
-    issueCharacters: i.entity({}),
+    issueCharacters: i.entity({
+      issueCharacterKey: i.string().unique().indexed(),
+    }),
     issueGenres: i.entity({}),
 
     // User library
@@ -92,6 +95,7 @@ const _schema = i.schema({
     }),
     userLists: i.entity({
       createdAt: i.date(),
+      listKey: i.string().unique().indexed(),
       name: i.string().indexed(),
       updatedAt: i.date(),
     }),
