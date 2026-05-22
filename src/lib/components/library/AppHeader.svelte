@@ -1,12 +1,21 @@
 <script lang="ts">
-	import { BookOpen, LogOut } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { BookOpen, LogOut, Search } from '@lucide/svelte';
 
 	type Props = {
+		onOpenSearch: () => void;
 		signedIn: boolean;
 		onSignOut: () => void;
 	};
 
-	let { signedIn, onSignOut }: Props = $props();
+	let { onOpenSearch, signedIn, onSignOut }: Props = $props();
+	let shortcutModifier = $state('⌘');
+
+	onMount(() => {
+		if (!/(Mac|iPhone|iPad|iPod)/.test(navigator.platform)) {
+			shortcutModifier = 'Ctrl';
+		}
+	});
 </script>
 
 <header
@@ -23,13 +32,36 @@
 	</div>
 
 	{#if signedIn}
-		<button
-			type="button"
-			class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted"
-			onclick={onSignOut}
-		>
-			<LogOut class="size-4" />
-			Sign out
-		</button>
+		<div class="flex flex-wrap items-center gap-2">
+			<button
+				type="button"
+				class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+				aria-label="Open comic search"
+				onclick={onOpenSearch}
+			>
+				<Search class="size-4" />
+				<span>Search</span>
+				<span class="ml-1 flex items-center gap-1 text-xs text-muted-foreground">
+					<kbd
+						class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium"
+					>
+						{shortcutModifier}
+					</kbd>
+					<kbd
+						class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium"
+					>
+						K
+					</kbd>
+				</span>
+			</button>
+			<button
+				type="button"
+				class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted"
+				onclick={onSignOut}
+			>
+				<LogOut class="size-4" />
+				Sign out
+			</button>
+		</div>
 	{/if}
 </header>

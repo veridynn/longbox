@@ -50,6 +50,7 @@
 	let authError = $state<string | null>(null);
 	let isSearching = $state(false);
 	let isSigningIn = $state(false);
+	let searchOpen = $state(false);
 	let addingIssueIds = $state<number[]>([]);
 
 	let libraryItems = $derived(
@@ -67,6 +68,21 @@
 
 	function isInLibrary(issue: SearchIssue) {
 		return libraryComicVineIds.has(issue.id);
+	}
+
+	function openSearch() {
+		searchOpen = true;
+	}
+
+	function handleGlobalKeydown(event: KeyboardEvent) {
+		if (!auth.user || event.defaultPrevented || event.key.toLowerCase() !== 'k') {
+			return;
+		}
+
+		if (event.metaKey || event.ctrlKey) {
+			event.preventDefault();
+			openSearch();
+		}
 	}
 
 	async function readJsonResponse(response: Response) {
@@ -159,9 +175,15 @@
 	<title>Longbox</title>
 </svelte:head>
 
+<svelte:document onkeydown={handleGlobalKeydown} />
+
 <main class="min-h-screen bg-background text-foreground">
 	<section class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
-		<AppHeader signedIn={Boolean(auth.user)} onSignOut={() => db.auth.signOut()} />
+		<AppHeader
+			signedIn={Boolean(auth.user)}
+			onOpenSearch={openSearch}
+			onSignOut={() => db.auth.signOut()}
+		/>
 
 		{#if auth.isLoading}
 			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
@@ -175,26 +197,25 @@
 				onSignIn={signInAsGuest}
 			/>
 		{:else}
-			<div class="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
-				<ComicSearchPanel
-					{addError}
-					{addingIssueIds}
-					bind:query
-					{isInLibrary}
-					{isSearching}
-					onAddIssue={addIssue}
-					onSearch={searchIssues}
-					resultLimit={12}
-					{results}
-					{searchError}
-				/>
+			<ComicSearchPanel
+				{addError}
+				{addingIssueIds}
+				bind:open={searchOpen}
+				bind:query
+				{isInLibrary}
+				{isSearching}
+				onAddIssue={addIssue}
+				onSearch={searchIssues}
+				resultLimit={12}
+				{results}
+				{searchError}
+			/>
 
-				<LibraryPanel
-					errorMessage={library.error?.message ?? null}
-					isLoading={library.isLoading}
-					items={libraryItems}
-				/>
-			</div>
+			<LibraryPanel
+				errorMessage={library.error?.message ?? null}
+				isLoading={library.isLoading}
+				items={libraryItems}
+			/>
 		{/if}
 	</section>
 </main>

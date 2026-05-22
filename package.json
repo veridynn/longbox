@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "@instantdb/admin": "^1.0.38",
-    "@instantdb/svelte": "^1.0.38"
+    "@instantdb/svelte": "^1.0.38",
+    "bits-ui": "^2.18.1"
   },
   "devDependencies": {
     "@eslint/compat": "latest",
