@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { BookOpen, LogOut, Search } from '@lucide/svelte';
+	import { BookOpen, LogOut, Save, Search } from '@lucide/svelte';
 
 	type Props = {
+		isGuest: boolean;
 		onOpenSearch: () => void;
+		onSaveAccount: () => void;
 		signedIn: boolean;
 		onSignOut: () => void;
 	};
 
-	let { onOpenSearch, signedIn, onSignOut }: Props = $props();
+	let { isGuest, onOpenSearch, onSaveAccount, signedIn, onSignOut }: Props = $props();
 	let shortcutModifier = $state('⌘');
 
 	onMount(() => {
@@ -33,6 +35,16 @@
 
 	{#if signedIn}
 		<div class="flex flex-wrap items-center gap-2">
+			{#if isGuest}
+				<button
+					type="button"
+					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+					onclick={onSaveAccount}
+				>
+					<Save class="size-4" />
+					Save
+				</button>
+			{/if}
 			<button
 				type="button"
 				class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
