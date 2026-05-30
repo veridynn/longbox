@@ -6,15 +6,15 @@ Longbox is a local-first comic library PWA with collection management, custom li
 
 ## Tech Stack
 
-Vite+
-TypeScript
-Svelte 5 runes, SvelteKit 2
-shadcn-svelte
-Tailwind CSS 4
-Runed
-InstantDB
-Vitest, Playwright
-Oxc
+- Vite Plus
+- TypeScript
+- Svelte 5 runes, SvelteKit 2
+- shadcn-svelte
+- Tailwind CSS 4
+- Runed
+- InstantDB
+- Vitest, Playwright
+- Oxc
 
 ## Commands
 
@@ -31,7 +31,10 @@ vp build
 
 - Never use `npx`. Use `vp dlx` instead
 - Do not overwrite user changes
+- Run `vp check` after code changes; run focused tests when behavior changes
 
 ## Docs
 
 Comic Vine API: `docs/agents/comic_vine_api.md`
+InstantDB: `docs/agents/instantdb.md`
+Svelte: `docs/agents/svelte.md`
