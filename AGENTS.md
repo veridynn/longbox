@@ -1,30 +1,37 @@
-# Longbox Agent Guide
+# AGENTS.md
 
-Longbox is a SvelteKit comic-library PWA using Svelte 5, Tailwind CSS 4, InstantDB, ComicVine, Vite+, Vitest, and Playwright.
+## Purpose
 
-## Read When Relevant
+Longbox is a local-first comic library PWA with collection management, custom lists, issue metadata, notes, and cross-device sync.
 
-Use focused docs only when the task touches that area:
+## Tech Stack
 
-- `docs/agents/instantdb.md` - InstantDB schema, permissions, auth, storage, queries, admin SDK
-- `docs/agents/svelte.md` - Svelte 5 and SvelteKit conventions
-- `docs/agents/comicvine.md` - ComicVine API normalization and import behavior
-
-If a change makes any of these docs inaccurate, update the relevant doc in the same change.
+Vite+
+TypeScript
+Svelte 5 runes, SvelteKit 2
+shadcn-svelte
+Tailwind CSS 4
+Runed
+InstantDB
+Vitest, Playwright
+Oxc
 
 ## Commands
 
-Use Vite+:
+vp install
+vp dlx <package>
+vp dev
+vp check
+vp test
+vp run test:e2e
+vp preview
+vp build
 
-- `vp install`
-- `vp dev`
-- `vp build`
-- `vp check`
-- `vp test`
-- `vp run test:e2e` when e2e coverage is relevant
+## Rules
 
-Prefer `vp` over direct package-manager, Vite, Vitest, or Playwright commands.
+- Never use `npx`. Use `vp dlx` instead
+- Do not overwrite user changes
 
-## Critical Rules
+## Docs
 
-- Do not expose secrets from `.env`.
+Comic Vine API: `docs/agents/comic_vine_api.md`

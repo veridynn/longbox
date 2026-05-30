@@ -8,20 +8,7 @@ Instant is a client-side database (Modern Firebase) with built-in queries, trans
 
 # Instant SDKs
 
-Instant provides client-side JS SDKs and an admin SDK:
-
-- `@instantdb/core` --- vanilla JS
-- `@instantdb/react` --- React
-- `@instantdb/react-native` --- React Native / Expo
-- `@instantdb/solidjs` --- SolidJS
-- `@instantdb/svelte` --- Svelte
-- `@instantdb/vue` --- Vue
-- `@instantdb/admin` --- backend scripts / servers
-
-When installing, always check what package manager the project uses (npm, pnpm,
-bun) first and then install the latest version of the Instant SDK. If working in
-React use Next and Tailwind unless specified otherwise.
-x
+Instant provides client-side JS SDKs and an admin SDK: `@instantdb/svelte`
 
 # Managing Instant Apps
 
@@ -34,8 +21,8 @@ If schema/perm files exist but the app id/admin token are missing, ask the user 
 
 To create a new app:
 
-```bash
-npx instant-cli init-without-files --title <APP_NAME>
+```sh
+vp dlx instant-cli init-without-files --title <APP_NAME>
 ```
 
 This outputs an app id and admin token. Store them in an env file.
@@ -43,37 +30,37 @@ This outputs an app id and admin token. Store them in an env file.
 If you get an error related to not being logged in tell the user to:
 
 - Sign up for free or log in at https://instantdb.com
-- Then run `npx instant-cli login` to authenticate the CLI
+- Then run `vp dlx instant-cli login` to authenticate the CLI
 - Then re-run the init command
 
 If you have an app id/admin token but no schema/perm files, pull them:
 
-```bash
-npx instant-cli pull --yes
+```sh
+vp dlx instant-cli pull --yes
 ```
 
 ## Schema changes
 
 Edit `instant.schema.ts`, then push:
 
-```bash
-npx instant-cli push schema --yes
+```sh
+vp dlx instant-cli push schema --yes
 ```
 
 New fields = additions; missing fields = deletions.
 
 To rename fields:
 
-```bash
-npx instant-cli push schema --rename 'posts.author:posts.creator stores.owner:stores.manager' --yes
+```sh
+vp dlx instant-cli push schema --rename 'posts.author:posts.creator stores.owner:stores.manager' --yes
 ```
 
 ## Permission changes
 
 Edit `instant.perms.ts`, then push:
 
-```bash
-npx instant-cli push perms --yes
+```sh
+vp dlx instant-cli push perms --yes
 ```
 
 # CRITICAL Query Guidelines
@@ -392,7 +379,7 @@ if (created) {
 
 # Ad-hoc queries from the CLI
 
-Run `npx instant-cli query '{ posts: {} }' --admin` to query your app. A context flag is required: `--admin`, `--as-email <email>`, or `--as-guest`. Also supports `--app <id>`.
+Run `vp dlx instant-cli query '{ posts: {} }' --admin` to query your app. A context flag is required: `--admin`, `--as-email <email>`, or `--as-guest`. Also supports `--app <id>`.
 
 # Instant Documentation
 
