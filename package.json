@@ -13,8 +13,8 @@
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write .",
     "test:unit": "vp test",
-    "test": "npm run test:unit -- --run && npm run test:e2e",
-    "test:e2e": "playwright install && playwright test"
+    "test": "vp run test:unit -- --run && vp run test:e2e",
+    "test:e2e": "vp exec playwright install && vp exec playwright test"
   },
   "dependencies": {
     "@instantdb/admin": "^1.0.39",
