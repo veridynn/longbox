@@ -19,7 +19,7 @@ Longbox is a local-first comic library PWA with collection management, custom li
 ## Commands
 
 vp install
-vp dlx <package>
+vpx <package>
 vp dev
 vp check
 vp test
@@ -29,7 +29,7 @@ vp build
 
 ## Rules
 
-- Never use `npx`. Use `vp dlx` instead
+- Never use `npx`. Use `vpx` instead
 - Do not overwrite user changes
 - Run `vp check` after code changes; run focused tests when behavior changes
 
