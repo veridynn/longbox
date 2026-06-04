@@ -16,6 +16,13 @@ export type LibraryItem = {
 	position: number;
 	userIssue?: {
 		id: string;
+		acquiredAt?: Date | null;
+		favorite?: boolean;
+		owned?: boolean;
+		rating?: number | null;
+		readStatus?: string;
+		updatedAt?: Date | null;
+		userNote?: string | null;
 		issue?: LibraryIssue | null;
 	} | null;
 };
@@ -27,7 +34,9 @@ export type LibraryIssue = {
 	comicVineId?: number | null;
 	coverDate?: Date | null;
 	coverImageUrl?: string | null;
+	descriptionHtml?: string | null;
 	rawComicVine?: unknown;
+	storeDate?: Date | null;
 	summary?: string | null;
 	volume?: {
 		id: string;

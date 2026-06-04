@@ -40,9 +40,11 @@
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
 									<h3 class="text-base font-semibold">
-										{issue.volume?.name ?? 'Unknown volume'} #{issue.issueNumber}{issue.name
-											? `: ${issue.name}`
-											: ''}
+										<a class="underline-offset-4 hover:underline" href={`/issues/${issue.id}`}>
+											{issue.volume?.name ?? 'Unknown volume'} #{issue.issueNumber}{issue.name
+												? `: ${issue.name}`
+												: ''}
+										</a>
 									</h3>
 									<p class="mt-1 text-sm text-muted-foreground">
 										{issue.volume?.publisher?.name ?? 'Unknown publisher'} · {formatDate(
