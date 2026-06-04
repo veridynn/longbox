@@ -34,6 +34,9 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
+      '@internationalized/date':
+        specifier: ^3.12.1
+        version: 3.12.1
       '@lucide/svelte':
         specifier: ^1.16.0
         version: 1.16.0(svelte@5.55.9(@typescript-eslint/types@8.59.4))

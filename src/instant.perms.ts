@@ -16,7 +16,7 @@ const rules = {
 	},
 	issueCharacters: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -24,7 +24,7 @@ const rules = {
 	},
 	people: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -32,7 +32,7 @@ const rules = {
 	},
 	volumes: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -66,7 +66,7 @@ const rules = {
 	},
 	characters: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -74,7 +74,7 @@ const rules = {
 	},
 	issueGenres: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -87,7 +87,7 @@ const rules = {
 	},
 	publishers: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -95,7 +95,7 @@ const rules = {
 	},
 	genres: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -103,7 +103,7 @@ const rules = {
 	},
 	issues: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'
@@ -120,7 +120,7 @@ const rules = {
 	},
 	issueCredits: {
 		allow: {
-			view: 'auth.id != null',
+			view: 'true',
 			create: 'false',
 			delete: 'false',
 			update: 'false'

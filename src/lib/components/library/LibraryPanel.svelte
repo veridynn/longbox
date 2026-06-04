@@ -2,6 +2,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import { characterNames, formatDate, groupedCredits } from '$lib/comics/format';
 	import type { LibraryItem } from '$lib/comics/types';
+	import { issueViewTransitionName } from '$lib/comics/view-transitions';
 
 	type Props = {
 		errorMessage: string | null;
@@ -35,11 +36,15 @@
 							class="h-36 w-24 rounded-md border border-border object-cover"
 							src={issue.coverImageUrl ?? '/robots.txt'}
 							alt=""
+							style:view-transition-name={issueViewTransitionName(issue.id, 'cover')}
 						/>
 						<div class="min-w-0">
 							<div class="flex flex-wrap items-start justify-between gap-3">
 								<div>
-									<h3 class="text-base font-semibold">
+									<h3
+										class="text-base font-semibold"
+										style:view-transition-name={issueViewTransitionName(issue.id, 'title')}
+									>
 										<a class="underline-offset-4 hover:underline" href={`/issues/${issue.id}`}>
 											{issue.volume?.name ?? 'Unknown volume'} #{issue.issueNumber}{issue.name
 												? `: ${issue.name}`
