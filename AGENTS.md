@@ -21,9 +21,9 @@ Longbox is a local-first comic library PWA with collection management, custom li
 vp install
 vpx <package>
 vp dev
-vp run check
+vpr check
 vp test
-vp run test:e2e
+vpr test:e2e
 vp preview
 vp build
 
