@@ -83,6 +83,8 @@ type ComicVineResponse<T> = {
 	results?: T;
 };
 
+type ComicVineRecord = Record<string, unknown>;
+
 export class ComicVineError extends Error {
 	constructor(
 		message: string,
@@ -100,11 +102,16 @@ function apiKey() {
 	return env.COMIC_VINE_API_KEY;
 }
 
-function imageUrl(image: ComicVineImage | null | undefined) {
+function objectRecord(value: unknown): Record<string, unknown> | null {
+	return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function imageUrl(value: unknown) {
+	const image = objectRecord(value) as ComicVineImage | null;
 	return image?.medium_url ?? image?.small_url ?? image?.thumb_url ?? image?.icon_url ?? null;
 }
 
-function numberId(value: number | string | null | undefined) {
+function numberId(value: unknown) {
 	const parsed = Number(value);
 	return Number.isFinite(parsed) ? parsed : null;
 }
@@ -117,7 +124,9 @@ function issueNumber(value: unknown) {
 	return text(value) ?? '0';
 }
 
-function normalizeRef(ref: ComicVineReference | null | undefined) {
+function normalizeRef(value: unknown) {
+	const ref = objectRecord(value) as ComicVineReference | null;
+
 	return {
 		id: numberId(ref?.id),
 		name: text(ref?.name)
@@ -182,7 +191,7 @@ async function comicVineGet<T>(path: string, params: Record<string, string | num
 	}
 }
 
-export function normalizeSearchIssue(raw: Record<string, any>): ComicVineSearchIssue | null {
+export function normalizeSearchIssue(raw: ComicVineRecord): ComicVineSearchIssue | null {
 	const id = numberId(raw.id);
 	if (!id) return null;
 
@@ -200,7 +209,7 @@ export function normalizeSearchIssue(raw: Record<string, any>): ComicVineSearchI
 	};
 }
 
-export function normalizeIssueDetail(raw: Record<string, any>): ComicVineIssueDetail {
+export function normalizeIssueDetail(raw: ComicVineRecord): ComicVineIssueDetail {
 	const id = numberId(raw.id);
 	if (!id) {
 		throw new ComicVineError('ComicVine issue detail is missing an id.');
@@ -256,7 +265,7 @@ export function normalizeIssueDetail(raw: Record<string, any>): ComicVineIssueDe
 	};
 }
 
-export function normalizeVolumeDetail(raw: Record<string, any>): ComicVineVolumeDetail {
+export function normalizeVolumeDetail(raw: ComicVineRecord): ComicVineVolumeDetail {
 	const id = numberId(raw.id);
 	const name = text(raw.name);
 
@@ -280,7 +289,7 @@ export function normalizeVolumeDetail(raw: Record<string, any>): ComicVineVolume
 }
 
 export async function searchComicVineIssues(query: string, limit = 12) {
-	const results = await comicVineGet<Record<string, any>[]>('/search/', {
+	const results = await comicVineGet<ComicVineRecord[]>('/search/', {
 		query,
 		resources: 'issue',
 		limit,
@@ -293,7 +302,7 @@ export async function searchComicVineIssues(query: string, limit = 12) {
 }
 
 export async function getComicVineIssue(issueId: number) {
-	const result = await comicVineGet<Record<string, any>>(`/issue/4000-${issueId}/`, {
+	const result = await comicVineGet<ComicVineRecord>(`/issue/4000-${issueId}/`, {
 		field_list:
 			'id,name,issue_number,cover_date,store_date,image,description,deck,volume,character_credits,person_credits'
 	});
@@ -302,7 +311,7 @@ export async function getComicVineIssue(issueId: number) {
 }
 
 export async function getComicVineVolume(volumeId: number) {
-	const result = await comicVineGet<Record<string, any>>(`/volume/4050-${volumeId}/`, {
+	const result = await comicVineGet<ComicVineRecord>(`/volume/4050-${volumeId}/`, {
 		field_list: 'id,name,start_year,status,deck,description,count_of_issues,image,publisher'
 	});
 

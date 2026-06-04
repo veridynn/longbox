@@ -11,9 +11,20 @@ export default defineConfig({
 		useTabs: true,
 		singleQuote: true,
 		trailingComma: 'none',
-		printWidth: 100
+		printWidth: 100,
+		sortTailwindcss: {
+			stylesheet: './src/routes/layout.css',
+			functions: ['clsx', 'cn']
+		}
 	},
-	lint: { options: { typeAware: true, typeCheck: true } },
+	lint: {
+		plugins: ['typescript'],
+		options: { typeAware: true, typeCheck: true },
+		rules: {
+			'typescript/no-empty-object-type': 'error',
+			'typescript/no-explicit-any': 'error'
+		}
+	},
 	plugins: [tailwindcss(), sveltekit()],
 	test: {
 		expect: { requireAssertions: true },

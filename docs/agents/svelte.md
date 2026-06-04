@@ -1,6 +1,6 @@
 ## Project Configuration
 
-- **Add-ons**: prettier, eslint, vitest, playwright, tailwindcss, sveltekit-adapter, mcp
+- **Add-ons**: vitest, playwright, tailwindcss, sveltekit-adapter, mcp
 
 ---
 

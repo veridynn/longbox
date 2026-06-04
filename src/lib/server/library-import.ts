@@ -1,4 +1,4 @@
-import { lookup, type TransactionChunk } from '@instantdb/admin';
+import { lookup } from '@instantdb/admin';
 import { getAdminDb } from '$lib/server/instant-admin';
 import {
 	getComicVineIssue,
@@ -112,8 +112,9 @@ export async function importComicVineIssue(
 	const stableListId = recordIdForKey(stableListKey);
 	const currentUserIssue = await existingUserIssue(stableUserIssueKey);
 	const position = await nextLibraryPosition(ownerId);
+	type TransactionInput = Parameters<typeof adminDb.transact>[0];
 
-	const transactions: TransactionChunk<any, any>[] = [
+	const transactions: Exclude<TransactionInput, readonly unknown[]>[] = [
 		adminDb.tx.userLists[stableListId]
 			.update({
 				createdAt: now,
