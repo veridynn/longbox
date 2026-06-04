@@ -49,13 +49,13 @@ Comic Vine returns an envelope, not raw results:
 
 ```ts
 type ComicVineResponse<T> = {
-  status_code?: number;
-  error?: string;
-  number_of_total_results?: number;
-  number_of_page_results?: number;
-  limit?: number;
-  offset?: number;
-  results?: T;
+	status_code?: number;
+	error?: string;
+	number_of_total_results?: number;
+	number_of_page_results?: number;
+	limit?: number;
+	offset?: number;
+	results?: T;
 };
 ```
 

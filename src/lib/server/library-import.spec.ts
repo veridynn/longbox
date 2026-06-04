@@ -1,156 +1,156 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getComicVineIssue, getComicVineVolume } from "$lib/server/comicvine";
-import { getAdminDb } from "$lib/server/instant-admin";
-import { importComicVineIssue } from "./library-import";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getComicVineIssue, getComicVineVolume } from '$lib/server/comicvine';
+import { getAdminDb } from '$lib/server/instant-admin';
+import { importComicVineIssue } from './library-import';
 
-vi.mock("$lib/server/comicvine", () => ({
-  getComicVineIssue: vi.fn(),
-  getComicVineVolume: vi.fn(),
+vi.mock('$lib/server/comicvine', () => ({
+	getComicVineIssue: vi.fn(),
+	getComicVineVolume: vi.fn()
 }));
 
-vi.mock("$lib/server/instant-admin", () => ({
-  getAdminDb: vi.fn(),
+vi.mock('$lib/server/instant-admin', () => ({
+	getAdminDb: vi.fn()
 }));
 
 function createTxNamespace(
-  namespace: string,
-  updates: Array<{ namespace: string; payload: unknown }>,
+	namespace: string,
+	updates: Array<{ namespace: string; payload: unknown }>
 ) {
-  return new Proxy(
-    {},
-    {
-      get: (_target, id) => ({
-        update: (payload: unknown) => {
-          updates.push({ namespace, payload });
+	return new Proxy(
+		{},
+		{
+			get: (_target, id) => ({
+				update: (payload: unknown) => {
+					updates.push({ namespace, payload });
 
-          return {
-            id,
-            namespace,
-            payload,
-            link: (links: unknown) => ({ id, namespace, payload, links }),
-          };
-        },
-      }),
-    },
-  );
+					return {
+						id,
+						namespace,
+						payload,
+						link: (links: unknown) => ({ id, namespace, payload, links })
+					};
+				}
+			})
+		}
+	);
 }
 
 function createAdminDb(query: (queryShape: Record<string, unknown>) => unknown) {
-  const updates: Array<{ namespace: string; payload: unknown }> = [];
-  const txNamespaces = [
-    "characters",
-    "issueCharacters",
-    "issueCredits",
-    "issues",
-    "people",
-    "publishers",
-    "userIssues",
-    "userListItems",
-    "userLists",
-    "volumes",
-  ];
+	const updates: Array<{ namespace: string; payload: unknown }> = [];
+	const txNamespaces = [
+		'characters',
+		'issueCharacters',
+		'issueCredits',
+		'issues',
+		'people',
+		'publishers',
+		'userIssues',
+		'userListItems',
+		'userLists',
+		'volumes'
+	];
 
-  return {
-    updates,
-    db: {
-      auth: { verifyToken: vi.fn() },
-      query: vi.fn(query),
-      transact: vi.fn(),
-      tx: Object.fromEntries(
-        txNamespaces.map((namespace) => [namespace, createTxNamespace(namespace, updates)]),
-      ),
-    },
-  };
+	return {
+		updates,
+		db: {
+			auth: { verifyToken: vi.fn() },
+			query: vi.fn(query),
+			transact: vi.fn(),
+			tx: Object.fromEntries(
+				txNamespaces.map((namespace) => [namespace, createTxNamespace(namespace, updates)])
+			)
+		}
+	};
 }
 
 const comicVineIssue = {
-  id: 123,
-  name: "The Bat",
-  issueNumber: "1",
-  coverDate: "1990-04-01",
-  storeDate: null,
-  coverImageUrl: "https://img.example/issue.jpg",
-  descriptionHtml: null,
-  summary: null,
-  volume: { id: 456, name: "The Bat" },
-  characters: [],
-  credits: [],
-  raw: { id: 123 },
+	id: 123,
+	name: 'The Bat',
+	issueNumber: '1',
+	coverDate: '1990-04-01',
+	storeDate: null,
+	coverImageUrl: 'https://img.example/issue.jpg',
+	descriptionHtml: null,
+	summary: null,
+	volume: { id: 456, name: 'The Bat' },
+	characters: [],
+	credits: [],
+	raw: { id: 123 }
 };
 
 const comicVineVolume = {
-  id: 456,
-  name: "The Bat",
-  startYear: "1990",
-  status: null,
-  summary: null,
-  issueCount: 1,
-  coverImageUrl: null,
-  publisher: { id: 10, name: "A Publisher" },
-  raw: { id: 456 },
+	id: 456,
+	name: 'The Bat',
+	startYear: '1990',
+	status: null,
+	summary: null,
+	issueCount: 1,
+	coverImageUrl: null,
+	publisher: { id: 10, name: 'A Publisher' },
+	raw: { id: 456 }
 };
 
-describe("importComicVineIssue", () => {
-  beforeEach(() => {
-    vi.mocked(getAdminDb).mockReset();
-    vi.mocked(getComicVineIssue).mockReset();
-    vi.mocked(getComicVineVolume).mockReset();
-  });
+describe('importComicVineIssue', () => {
+	beforeEach(() => {
+		vi.mocked(getAdminDb).mockReset();
+		vi.mocked(getComicVineIssue).mockReset();
+		vi.mocked(getComicVineVolume).mockReset();
+	});
 
-  it("short-circuits duplicate library adds before fetching ComicVine", async () => {
-    const { db } = createAdminDb((queryShape) => {
-      if ("userListItems" in queryShape) {
-        return { userListItems: [{ position: 7 }] };
-      }
+	it('short-circuits duplicate library adds before fetching ComicVine', async () => {
+		const { db } = createAdminDb((queryShape) => {
+			if ('userListItems' in queryShape) {
+				return { userListItems: [{ position: 7 }] };
+			}
 
-      return {};
-    });
+			return {};
+		});
 
-    vi.mocked(getAdminDb).mockReturnValue(db as never);
+		vi.mocked(getAdminDb).mockReturnValue(db as never);
 
-    await expect(importComicVineIssue("user-1", 123)).resolves.toEqual({
-      alreadyInLibrary: true,
-      issueId: "123",
-      userIssueKey: "user-1:comicvine:123",
-      listItemKey: "user-1:library:comicvine:123",
-    });
+		await expect(importComicVineIssue('user-1', 123)).resolves.toEqual({
+			alreadyInLibrary: true,
+			issueId: '123',
+			userIssueKey: 'user-1:comicvine:123',
+			listItemKey: 'user-1:library:comicvine:123'
+		});
 
-    expect(getComicVineIssue).not.toHaveBeenCalled();
-    expect(getComicVineVolume).not.toHaveBeenCalled();
-    expect(db.transact).not.toHaveBeenCalled();
-  });
+		expect(getComicVineIssue).not.toHaveBeenCalled();
+		expect(getComicVineVolume).not.toHaveBeenCalled();
+		expect(db.transact).not.toHaveBeenCalled();
+	});
 
-  it("does not reset existing user issue fields when adding it to the library list", async () => {
-    const { db, updates } = createAdminDb((queryShape) => {
-      if ("userListItems" in queryShape) {
-        return { userListItems: [] };
-      }
+	it('does not reset existing user issue fields when adding it to the library list', async () => {
+		const { db, updates } = createAdminDb((queryShape) => {
+			if ('userListItems' in queryShape) {
+				return { userListItems: [] };
+			}
 
-      if ("userIssues" in queryShape) {
-        return { userIssues: [{ id: "existing-user-issue" }] };
-      }
+			if ('userIssues' in queryShape) {
+				return { userIssues: [{ id: 'existing-user-issue' }] };
+			}
 
-      return {};
-    });
+			return {};
+		});
 
-    vi.mocked(getAdminDb).mockReturnValue(db as never);
-    vi.mocked(getComicVineIssue).mockResolvedValue(comicVineIssue);
-    vi.mocked(getComicVineVolume).mockResolvedValue(comicVineVolume);
+		vi.mocked(getAdminDb).mockReturnValue(db as never);
+		vi.mocked(getComicVineIssue).mockResolvedValue(comicVineIssue);
+		vi.mocked(getComicVineVolume).mockResolvedValue(comicVineVolume);
 
-    await expect(importComicVineIssue("user-1", 123)).resolves.toMatchObject({
-      alreadyInLibrary: false,
-      issueId: "123",
-    });
+		await expect(importComicVineIssue('user-1', 123)).resolves.toMatchObject({
+			alreadyInLibrary: false,
+			issueId: '123'
+		});
 
-    const userIssueUpdate = updates.find((update) => update.namespace === "userIssues");
+		const userIssueUpdate = updates.find((update) => update.namespace === 'userIssues');
 
-    expect(userIssueUpdate?.payload).toEqual({
-      owned: true,
-      updatedAt: expect.any(Date),
-    });
-    expect(userIssueUpdate?.payload).not.toHaveProperty("favorite");
-    expect(userIssueUpdate?.payload).not.toHaveProperty("readStatus");
-    expect(userIssueUpdate?.payload).not.toHaveProperty("rating");
-    expect(db.transact).toHaveBeenCalledOnce();
-  });
+		expect(userIssueUpdate?.payload).toEqual({
+			owned: true,
+			updatedAt: expect.any(Date)
+		});
+		expect(userIssueUpdate?.payload).not.toHaveProperty('favorite');
+		expect(userIssueUpdate?.payload).not.toHaveProperty('readStatus');
+		expect(userIssueUpdate?.payload).not.toHaveProperty('rating');
+		expect(db.transact).toHaveBeenCalledOnce();
+	});
 });

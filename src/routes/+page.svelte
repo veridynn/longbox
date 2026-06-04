@@ -200,8 +200,7 @@
 			saveAccountCode = '';
 			saveAccountCodeSent = true;
 		} catch (error) {
-			saveAccountError =
-				error instanceof Error ? error.message : 'Unable to send a sign-in code.';
+			saveAccountError = error instanceof Error ? error.message : 'Unable to send a sign-in code.';
 		} finally {
 			isSavingAccount = false;
 		}
@@ -228,8 +227,7 @@
 			saveAccountCode = '';
 			saveAccountCodeSent = false;
 		} catch (error) {
-			saveAccountError =
-				error instanceof Error ? error.message : 'Unable to save this account.';
+			saveAccountError = error instanceof Error ? error.message : 'Unable to save this account.';
 			saveAccountCode = '';
 		} finally {
 			isSavingAccount = false;

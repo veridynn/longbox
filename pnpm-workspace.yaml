@@ -1,17 +1,17 @@
 allowBuilds:
-  "@tailwindcss/oxide": true
+  '@tailwindcss/oxide': true
   esbuild: true
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.1.22
   vitest: npm:@voidzero-dev/vite-plus-test@0.1.22
   vite-plus: 0.1.22
 overrides:
-  vite: "catalog:"
-  vitest: "catalog:"
+  vite: 'catalog:'
+  vitest: 'catalog:'
 peerDependencyRules:
   allowAny:
     - vite
     - vitest
   allowedVersions:
-    vite: "*"
-    vitest: "*"
+    vite: '*'
+    vitest: '*'
