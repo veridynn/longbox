@@ -20,10 +20,10 @@ Longbox is a local-first comic library PWA with collection management, custom li
 
 vp install
 vpx <package>
-vp dev
+vpr dev
 vpr check
 vp test
-vpr test:e2e
+vpr test
 vp preview
 vp build
 

@@ -4,14 +4,14 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vp dev",
+		"dev": "vpx @infisical/cli run -- vp dev",
 		"build": "vp build",
 		"preview": "vp preview",
 		"prepare": "vp config && svelte-kit sync || echo ''",
 		"check": "vp check && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"test:unit": "vp test",
 		"test": "vp run test:unit -- --run && vp run test:e2e",
+		"test:unit": "vp test",
 		"test:e2e": "vp exec playwright install && vp exec playwright test"
 	},
 	"dependencies": {
