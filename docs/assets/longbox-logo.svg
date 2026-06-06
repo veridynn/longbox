@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Longbox logo</title>
+  <rect width="512" height="512" rx="96" fill="#151716"/>
+  <rect x="104" y="112" width="304" height="288" rx="28" fill="#f8f2e8"/>
+  <rect x="132" y="144" width="248" height="224" rx="14" fill="#d9432f"/>
+  <path d="M160 173h72v84h-72z" fill="#f8f2e8"/>
+  <path d="M256 173h96v24h-96zM256 217h96v24h-96zM160 292h192v24H160zM160 336h148v24H160z" fill="#f8f2e8"/>
+  <path d="M104 400h304v18c0 18-14 32-32 32H136c-18 0-32-14-32-32z" fill="#272b29"/>
+</svg>

@@ -62,5 +62,5 @@ Run the test suite:
 vpr test
 ```
 
-[longbox-logo]: static/icons/longbox-icon.svg
+[longbox-logo]: docs/assets/longbox-logo.svg
 [tech-stack-icons]: https://skillicons.dev/icons?i=svelte,ts,vite,pnpm
