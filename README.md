@@ -1,24 +1,66 @@
-# Longbox
+# ![Longbox logo][longbox-logo] Longbox
 
-Longbox is a local-first PWA comic library designed to help collectors organize and rediscover their collection.
+Longbox is a local-first comic library for organizing a personal collection, keeping issue notes, building custom lists, and rediscovering what is already on the shelf.
 
-## Developing
+## 🧰 Tech Stack
+
+![svelte-typescript-vite-pnpm][tech-stack-icons]
+
+- `SvelteKit 2`
+- `Svelte 5`
+- `TypeScript`
+- `Vite Plus`
+- `pnpm`
+
+## 🚀 Quick Start
+
+> [!IMPORTANT]
+> Requires Node.js `24.16.0`, pnpm `11.5.1`, and Vite Plus `0.1.22`.
+> Secrets are listed in `.env.example`.
 
 ```sh
-vp dev
-
-# or start the server and open the app in a new browser tab
-vp dev -- --open
+vp install && vpr dev
 ```
 
-## Building
+## 📜 Scripts
 
-To create a production version of your app:
+### Development server
+
+Start the dev environment with injected secrets:
+
+```sh
+vpr dev
+```
+
+### Production
+
+Build the application for production:
 
 ```sh
 vp build
 ```
 
-You can preview the production build with `vp preview`.
+Preview the production build:
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```sh
+vp preview
+```
+
+### Check
+
+Run Svelte and TypeScript checks:
+
+```sh
+vpr check
+```
+
+### Tests
+
+Run the test suite:
+
+```sh
+vpr test
+```
+
+[longbox-logo]: static/icons/longbox-icon.svg
+[tech-stack-icons]: https://skillicons.dev/icons?i=svelte,ts,vite,pnpm
