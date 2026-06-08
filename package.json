@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vpx @infisical/cli run -- vp dev",
+		"dev": "infisical run -- vp dev",
 		"build": "vp build",
 		"preview": "vp preview",
 		"prepare": "vp config && svelte-kit sync || echo ''",
@@ -22,6 +22,7 @@
 	},
 	"devDependencies": {
 		"@fontsource-variable/inter": "^5.2.8",
+		"@infisical/cli": "^0.43.91",
 		"@internationalized/date": "^3.12.1",
 		"@lucide/svelte": "^1.16.0",
 		"@playwright/test": "^1.60.0",

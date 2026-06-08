@@ -1,4 +1,5 @@
 allowBuilds:
+  '@infisical/cli': true
   '@tailwindcss/oxide': true
   esbuild: true
 catalog:
