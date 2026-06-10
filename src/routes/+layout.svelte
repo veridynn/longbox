@@ -1,23 +1,57 @@
 <script lang="ts">
 	import { onNavigate } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { flushSync, onMount } from 'svelte';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import {
+		activateIssueTransition,
+		clearIssueTransition,
+		issueTransitionDirection,
+		markIssueTransitionIncoming
+	} from '$lib/comics/view-transitions.svelte';
 
 	let { children } = $props();
+	let activeViewTransition: ViewTransition | null = null;
 
 	onNavigate((navigation) => {
-		if (
-			!document.startViewTransition ||
-			window.matchMedia('(prefers-reduced-motion: reduce)').matches
-		) {
+		const direction = issueTransitionDirection(navigation);
+
+		if (!direction) {
 			return;
 		}
 
-		return new Promise((resolve) => {
-			document.startViewTransition(async () => {
-				resolve();
-				await navigation.complete;
+		if (
+			activeViewTransition ||
+			!document.startViewTransition ||
+			window.matchMedia('(prefers-reduced-motion: reduce)').matches
+		) {
+			clearIssueTransition();
+			return;
+		}
+
+		const activated = flushSync(() => activateIssueTransition(navigation));
+		if (!activated) {
+			return;
+		}
+
+		document.documentElement.classList.add(activated.direction);
+
+		return new Promise<void>((resolveOldStateCapture) => {
+			const transition = document.startViewTransition({
+				types: [activated.direction],
+				update: async () => {
+					resolveOldStateCapture();
+					await navigation.complete;
+					flushSync(markIssueTransitionIncoming);
+				}
+			});
+
+			activeViewTransition = transition;
+
+			void transition.finished.finally(() => {
+				document.documentElement.classList.remove(activated.direction);
+				activeViewTransition = null;
+				clearIssueTransition();
 			});
 		});
 	});

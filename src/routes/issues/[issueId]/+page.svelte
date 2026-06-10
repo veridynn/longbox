@@ -13,6 +13,7 @@
 		Star
 	} from '@lucide/svelte';
 	import { CalendarDate, DateFormatter, getLocalTimeZone, type DateValue } from '@internationalized/date';
+	import { flushSync } from 'svelte';
 	import type { PageProps } from './$types';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
@@ -22,7 +23,12 @@
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
 	import { formatDate } from '$lib/comics/format';
 	import type { LibraryIssue } from '$lib/comics/types';
-	import { issueViewTransitionName } from '$lib/comics/view-transitions';
+	import {
+		getIssueTransitionPreview,
+		isActiveIssueTransition,
+		issueViewTransitionName,
+		primeIssueTransition
+	} from '$lib/comics/view-transitions.svelte';
 	import { db } from '$lib/db';
 
 	type DetailUserIssue = {
@@ -98,7 +104,12 @@
 		(userIssueQuery.data?.userIssues?.[0] as DetailUserIssue | undefined) ?? null
 	);
 	const issue = $derived((issueQuery.data?.issues?.[0] as LibraryIssue | undefined) ?? null);
-	const title = $derived(issue ? issueTitle(issue) : 'Issue details');
+	const transitionPreview = $derived(getIssueTransitionPreview(params.issueId));
+	const title = $derived(issue ? issueTitle(issue) : (transitionPreview?.title ?? 'Issue details'));
+	const coverImageUrl = $derived(issue?.coverImageUrl ?? transitionPreview?.coverImageUrl ?? null);
+	const coverInViewTransition = $derived(
+		isActiveIssueTransition(params.issueId) || transitionPreview?.issueId === params.issueId
+	);
 	const credits = $derived(groupCredits(issue));
 	const characters = $derived(characterNames(issue));
 	const details = $derived(detailRows(issue));
@@ -310,6 +321,12 @@
 		}
 	}
 
+	function prepareIssueTransition() {
+		if (issue) {
+			flushSync(() => primeIssueTransition(issue));
+		}
+	}
+
 	function issueTitle(issueValue: LibraryIssue) {
 		const volumeName = issueValue.volume?.name ?? 'Unknown volume';
 		const issueName = issueValue.name ? `: ${issueValue.name}` : '';
@@ -376,23 +393,29 @@
 <main class="min-h-screen bg-background text-foreground">
 	<section class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
 		<div>
-			<Button href="/" variant="ghost" class="mb-4 -ml-2">
+			<Button
+				href="/"
+				variant="ghost"
+				class="mb-4 -ml-2"
+				onpointerdown={prepareIssueTransition}
+				onclick={prepareIssueTransition}
+			>
 				<ArrowLeft data-icon="inline-start" />
 				Library
 			</Button>
 		</div>
 
-		{#if issueQuery.isLoading}
-			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
-				<LoaderCircle class="mr-2 size-4 animate-spin" />
-				Loading issue
-			</div>
-		{:else if issueQuery.error}
+		{#if issueQuery.error}
 			<section class="rounded-lg border border-border bg-card p-6">
 				<h1 class="text-2xl font-semibold">Unable to load issue</h1>
 				<p class="mt-2 text-sm leading-6 text-destructive">{issueQuery.error.message}</p>
 			</section>
-		{:else if !issue}
+		{:else if issueQuery.isLoading && !transitionPreview}
+			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
+				<LoaderCircle class="mr-2 size-4 animate-spin" />
+				Loading issue
+			</div>
+		{:else if !issue && !transitionPreview}
 			<section class="rounded-lg border border-border bg-card p-6">
 				<h1 class="text-2xl font-semibold">Issue not found</h1>
 				<p class="mt-2 text-sm leading-6 text-muted-foreground">
@@ -404,12 +427,22 @@
 				<aside class="space-y-4">
 					<img
 						class="aspect-[2/3] w-full rounded-lg border border-border object-cover"
-						src={issue.coverImageUrl ?? '/robots.txt'}
+						src={coverImageUrl ?? '/robots.txt'}
 						alt=""
-						style:view-transition-name={issueViewTransitionName(issue.id, 'cover')}
+						style:view-transition-name={coverInViewTransition
+							? issueViewTransitionName(params.issueId, 'cover')
+							: null}
+						style:view-transition-class={coverInViewTransition ? 'issue-cover' : null}
 					/>
 
-					{#if auth.isLoading}
+					{#if !issue}
+						<section class="rounded-lg border border-border bg-card p-4">
+							<div class="flex items-center text-sm text-muted-foreground">
+								<LoaderCircle class="mr-2 size-4 animate-spin" />
+								Loading issue
+							</div>
+						</section>
+					{:else if auth.isLoading}
 						<section class="rounded-lg border border-border bg-card p-4">
 							<div class="flex items-center text-sm text-muted-foreground">
 								<LoaderCircle class="mr-2 size-4 animate-spin" />
@@ -608,64 +641,67 @@
 				<div class="min-w-0 space-y-6">
 					<header>
 						<p class="text-sm font-medium text-muted-foreground">
-							{issue.volume?.publisher?.name ?? 'Unknown publisher'}
+							{issue?.volume?.publisher?.name ?? 'Unknown publisher'}
 						</p>
-						<h1
-							class="mt-2 text-3xl font-semibold tracking-normal text-balance"
-							style:view-transition-name={issueViewTransitionName(issue.id, 'title')}
-						>
+						<h1 class="mt-2 text-3xl font-semibold tracking-normal text-balance">
 							{title}
 						</h1>
 						<p class="mt-2 text-sm text-muted-foreground">
-							{formatDate(issue.coverDate)} · {issue.volume?.name ?? 'Unknown volume'}
+							{#if issue}
+								{formatDate(issue.coverDate)} · {issue.volume?.name ?? 'Unknown volume'}
+							{:else}
+								Loading issue
+							{/if}
 						</p>
 					</header>
 
-					<section class="rounded-lg border border-border bg-card p-4">
-						<h2 class="font-semibold">Details</h2>
-						<dl class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-							{#each details as [label, value] (label)}
-								<div>
-									<dt class="text-xs font-semibold text-muted-foreground uppercase">{label}</dt>
-									<dd class="mt-1 text-sm">{value}</dd>
-								</div>
-							{/each}
-						</dl>
-					</section>
-
-					{#if issue.summary || issue.descriptionHtml}
+					{#if issue}
 						<section class="rounded-lg border border-border bg-card p-4">
-							<h2 class="font-semibold">Description</h2>
-							{#if issue.summary}
-								<p class="mt-3 text-sm leading-6 text-muted-foreground">{issue.summary}</p>
-							{/if}
-							{#if issue.descriptionHtml}
-								<div class="prose prose-sm mt-4 max-w-none text-foreground">
-									{@html issue.descriptionHtml}
-								</div>
-							{/if}
+							<h2 class="font-semibold">Details</h2>
+							<dl class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+								{#each details as [label, value] (label)}
+									<div>
+										<dt class="text-xs font-semibold text-muted-foreground uppercase">{label}</dt>
+										<dd class="mt-1 text-sm">{value}</dd>
+									</div>
+								{/each}
+							</dl>
+						</section>
+
+						{#if issue.summary || issue.descriptionHtml}
+							<section class="rounded-lg border border-border bg-card p-4">
+								<h2 class="font-semibold">Description</h2>
+								{#if issue.summary}
+									<p class="mt-3 text-sm leading-6 text-muted-foreground">{issue.summary}</p>
+								{/if}
+								{#if issue.descriptionHtml}
+									<div class="prose prose-sm mt-4 max-w-none text-foreground">
+										{@html issue.descriptionHtml}
+									</div>
+								{/if}
+							</section>
+						{/if}
+
+						<section class="grid gap-6 md:grid-cols-2">
+							<div class="rounded-lg border border-border bg-card p-4">
+								<h2 class="font-semibold">Characters</h2>
+								<p class="mt-3 text-sm leading-6">
+									{characters.join(', ') || 'No character credits'}
+								</p>
+							</div>
+
+							<div class="rounded-lg border border-border bg-card p-4">
+								<h2 class="font-semibold">Credits</h2>
+								<ul class="mt-3 space-y-2 text-sm leading-6">
+									{#each credits as credit (credit.role)}
+										<li><span class="font-medium">{credit.role}:</span> {credit.names}</li>
+									{:else}
+										<li>No creator credits</li>
+									{/each}
+								</ul>
+							</div>
 						</section>
 					{/if}
-
-					<section class="grid gap-6 md:grid-cols-2">
-						<div class="rounded-lg border border-border bg-card p-4">
-							<h2 class="font-semibold">Characters</h2>
-							<p class="mt-3 text-sm leading-6">
-								{characters.join(', ') || 'No character credits'}
-							</p>
-						</div>
-
-						<div class="rounded-lg border border-border bg-card p-4">
-							<h2 class="font-semibold">Credits</h2>
-							<ul class="mt-3 space-y-2 text-sm leading-6">
-								{#each credits as credit (credit.role)}
-									<li><span class="font-medium">{credit.role}:</span> {credit.names}</li>
-								{:else}
-									<li>No creator credits</li>
-								{/each}
-							</ul>
-						</div>
-					</section>
 				</div>
 			</div>
 		{/if}

@@ -130,16 +130,59 @@
 	}
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-	animation-duration: 180ms;
-	animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+@keyframes issue-page-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(0.5rem);
+	}
 }
 
-::view-transition-old(*),
-::view-transition-new(*) {
-	animation-duration: 260ms;
-	animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+@keyframes issue-page-fade-out {
+	to {
+		opacity: 0;
+		transform: translateY(-0.25rem);
+	}
+}
+
+@keyframes issue-page-back-in {
+	from {
+		opacity: 0;
+		transform: translateY(-0.25rem);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	html.issue-forward::view-transition-new(root) {
+		animation: issue-page-fade-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	html.issue-forward::view-transition-old(root) {
+		animation: issue-page-fade-out 140ms cubic-bezier(0.4, 0, 1, 1) both;
+	}
+
+	html.issue-back::view-transition-new(root) {
+		animation: issue-page-back-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	}
+
+	html.issue-back::view-transition-old(root) {
+		animation: issue-page-fade-out 120ms cubic-bezier(0.4, 0, 1, 1) both;
+	}
+
+	::view-transition-group(.issue-cover) {
+		animation-duration: 320ms;
+		animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+		overflow: clip;
+		z-index: 10;
+	}
+
+	::view-transition-old(.issue-cover),
+	::view-transition-new(.issue-cover) {
+		animation-duration: inherit;
+		height: 100%;
+		mix-blend-mode: normal;
+		object-fit: cover;
+		width: 100%;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
