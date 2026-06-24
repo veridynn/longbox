@@ -67,7 +67,7 @@ describe('POST /api/library/add', () => {
 
 		expect(response.status).toBe(200);
 		expect(verifyInstantToken).toHaveBeenCalledWith('token');
-		expect(importComicVineIssue).toHaveBeenCalledWith('user-1', 123);
+		expect(importComicVineIssue).toHaveBeenCalledWith('user-1', 123, null);
 		await expect(response.json()).resolves.toEqual({
 			imported: {
 				alreadyInLibrary: false,
@@ -76,5 +76,34 @@ describe('POST /api/library/add', () => {
 				listItemKey: 'user-1:library:comicvine:123'
 			}
 		});
+	});
+
+	it('passes an optional target list id', async () => {
+		vi.mocked(verifyInstantToken).mockResolvedValue({
+			id: 'user-1',
+			refresh_token: 'token',
+			isGuest: true,
+			type: 'guest'
+		});
+		vi.mocked(importComicVineIssue).mockResolvedValue({
+			alreadyInLibrary: false,
+			issueId: '123',
+			userIssueKey: 'user-1:comicvine:123',
+			listItemKey: 'user-1:library:comicvine:123'
+		});
+
+		const response = await POST({
+			request: new Request('http://localhost/api/library/add', {
+				method: 'POST',
+				headers: {
+					authorization: 'Bearer token',
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({ issueId: 123, listId: 'list-1' })
+			})
+		} as never);
+
+		expect(response.status).toBe(200);
+		expect(importComicVineIssue).toHaveBeenCalledWith('user-1', 123, 'list-1');
 	});
 });

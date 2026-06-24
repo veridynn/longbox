@@ -1,11 +1,19 @@
 <script lang="ts">
+	import { id } from '@instantdb/svelte';
 	import { LoaderCircle } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
 	import AppHeader from '$lib/components/library/AppHeader.svelte';
 	import AuthGate from '$lib/components/library/AuthGate.svelte';
 	import ComicSearchPanel from '$lib/components/library/ComicSearchPanel.svelte';
+	import CreateListDialog from '$lib/components/library/CreateListDialog.svelte';
 	import LibraryPanel from '$lib/components/library/LibraryPanel.svelte';
-	import SaveAccountDialog from '$lib/components/library/SaveAccountDialog.svelte';
+	import ListsPanel from '$lib/components/library/ListsPanel.svelte';
 	import StatsPanel from '$lib/components/library/StatsPanel.svelte';
+	import {
+		validateListName,
+		type CustomListSummary
+	} from '$lib/components/library/lists';
+	import SaveAccountDialog from '$lib/components/library/SaveAccountDialog.svelte';
 	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
 	import { db } from '$lib/db';
 
@@ -52,6 +60,16 @@
 							where: {
 								'owner.id': auth.user.id
 							}
+						},
+						items: {
+							$: {
+								order: {
+									position: 'asc'
+								}
+							},
+							userIssue: {
+								issue: {}
+							}
 						}
 					}
 				}
@@ -76,6 +94,10 @@
 	let saveAccountError = $state<string | null>(null);
 	let isSavingAccount = $state(false);
 	let addingIssueIds = $state<number[]>([]);
+	let createListOpen = $state(false);
+	let createListName = $state('');
+	let createListError = $state<string | null>(null);
+	let isCreatingList = $state(false);
 
 	let libraryItems = $derived(
 		((library.data?.userLists?.[0]?.items ?? []) as LibraryItem[]).filter(
@@ -98,9 +120,24 @@
 	let readCount = $derived(
 		libraryItems.filter((item) => item.userIssue?.readStatus === 'read').length
 	);
-	let customListCount = $derived(
-		(lists.data?.userLists ?? []).filter((list) => list.name !== 'Library').length
-	);
+	let customLists = $derived.by(() => {
+		const userLists = lists.data?.userLists ?? [];
+
+		return userLists
+			.filter((list) => list.name !== 'Library')
+			.sort((first, second) => first.createdAt.getTime() - second.createdAt.getTime())
+			.map(
+				(list): CustomListSummary => ({
+					coverImageUrls: list.items
+						.map((item) => item.userIssue?.issue?.coverImageUrl)
+						.filter((url): url is string => Boolean(url))
+						.slice(0, 5),
+					id: list.id,
+					issueCount: list.items.length,
+					name: list.name
+				})
+			);
+	});
 
 	function isInLibrary(issue: SearchIssue) {
 		return libraryComicVineIds.has(issue.id);
@@ -113,6 +150,67 @@
 	function openSaveAccount() {
 		saveAccountError = null;
 		saveAccountOpen = true;
+	}
+
+	function openCreateList() {
+		if (createListOpen || isCreatingList) {
+			return;
+		}
+
+		createListName = '';
+		createListError = null;
+		createListOpen = true;
+	}
+
+	function closeCreateList() {
+		if (isCreatingList) {
+			return;
+		}
+
+		createListOpen = false;
+		createListName = '';
+		createListError = null;
+	}
+
+	async function createList() {
+		if (!auth.user || isCreatingList) {
+			return;
+		}
+
+		const trimmedName = createListName.trim();
+		const validationError = validateListName(
+			trimmedName,
+			customLists.map((list) => list.name)
+		);
+		createListError = validationError;
+
+		if (validationError) {
+			return;
+		}
+
+		isCreatingList = true;
+		const listId = id();
+		const now = new Date();
+
+		try {
+			await db.transact(
+				db.tx.userLists[listId]
+					.update({
+						createdAt: now,
+						listKey: `${auth.user.id}:custom:${listId}`,
+						name: trimmedName,
+						updatedAt: now
+					})
+					.link({ owner: auth.user.id })
+			);
+			createListOpen = false;
+			createListName = '';
+			await goto(`/list/${listId}`);
+		} catch (error) {
+			createListError = error instanceof Error ? error.message : 'Unable to create this list.';
+		} finally {
+			isCreatingList = false;
+		}
 	}
 
 	function backToSaveAccountEmail() {
@@ -387,13 +485,24 @@
 				/>
 			{/if}
 
+			<CreateListDialog
+				errorMessage={createListError}
+				bind:name={createListName}
+				bind:open={createListOpen}
+				isSubmitting={isCreatingList}
+				onCancel={closeCreateList}
+				onSubmit={createList}
+			/>
+
 			<StatsPanel
 				{favoriteCount}
 				issueCount={libraryItems.length}
-				listCount={customListCount}
+				listCount={customLists.length}
 				{readCount}
 				{watchlistCount}
 			/>
+
+			<ListsPanel {customLists} onCreateList={openCreateList} />
 
 			<LibraryPanel
 				errorMessage={library.error?.message ?? null}

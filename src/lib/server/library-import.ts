@@ -22,6 +22,13 @@ type ImportedIssue = {
 	listItemKey: string;
 };
 
+type TargetList = {
+	id: string;
+	listKey: string;
+	name: string;
+	items?: unknown[];
+};
+
 function parseDate(value: string | null) {
 	if (!value) return null;
 
@@ -79,20 +86,72 @@ async function existingUserIssue(userIssueKeyValue: string) {
 	return data.userIssues[0] as { id?: string } | undefined;
 }
 
+async function ownedCustomList(ownerId: string, listId: string) {
+	const adminDb = getAdminDb();
+	const data = await adminDb.query({
+		userLists: {
+			$: {
+				where: {
+					id: listId,
+					'owner.id': ownerId
+				}
+			},
+			items: {}
+		}
+	});
+	const list = data.userLists[0] as TargetList | undefined;
+
+	if (!list || list.name === libraryName()) {
+		throw new Error('List not found.');
+	}
+
+	return list;
+}
+
+async function addUserIssueKeyToList(list: TargetList, userIssueKeyValue: string) {
+	const adminDb = getAdminDb();
+	const stableListItemKey = `${list.listKey}:userIssue:${userIssueKeyValue}`;
+
+	if (await existingListItem(stableListItemKey)) {
+		return stableListItemKey;
+	}
+
+	await adminDb.transact(
+		adminDb.tx.userListItems[lookup('listItemKey', stableListItemKey)]
+			.update({
+				addedAt: new Date(),
+				listItemKey: stableListItemKey,
+				position: list.items?.length ?? 0
+			})
+			.link({
+				list: list.id,
+				userIssue: lookup('userIssueKey', userIssueKeyValue)
+			})
+	);
+
+	return stableListItemKey;
+}
+
 export async function verifyInstantToken(token: string) {
 	return getAdminDb().auth.verifyToken(token);
 }
 
 export async function importComicVineIssue(
 	ownerId: string,
-	issueComicVineId: number
+	issueComicVineId: number,
+	targetListId?: string | null
 ): Promise<ImportedIssue> {
 	const adminDb = getAdminDb();
 	const inputUserIssueKey = userIssueKey(ownerId, issueComicVineId);
 	const inputListItemKey = listItemKey(ownerId, issueComicVineId);
+	const targetList = targetListId ? await ownedCustomList(ownerId, targetListId) : null;
 	const currentListItem = await existingListItem(inputListItemKey);
 
 	if (currentListItem) {
+		if (targetList) {
+			await addUserIssueKeyToList(targetList, inputUserIssueKey);
+		}
+
 		return {
 			issueId: String(issueComicVineId),
 			alreadyInLibrary: true,
@@ -234,6 +293,10 @@ export async function importComicVineIssue(
 	);
 
 	await adminDb.transact(transactions);
+
+	if (targetList) {
+		await addUserIssueKeyToList(targetList, stableUserIssueKey);
+	}
 
 	return {
 		issueId: String(issue.id),

@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ error: 'Authentication is required.' }, { status: 401 });
 	}
 
-	let body: { issueId?: unknown };
+	let body: { issueId?: unknown; listId?: unknown };
 
 	try {
 		body = (await request.json()) as { issueId?: unknown };
@@ -24,6 +24,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const issueId = Number(body.issueId);
+	const listId = typeof body.listId === 'string' && body.listId.trim() ? body.listId.trim() : null;
 
 	if (!Number.isInteger(issueId) || issueId <= 0) {
 		return json({ error: 'A valid ComicVine issue id is required.' }, { status: 400 });
@@ -31,7 +32,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		const user = await verifyInstantToken(token);
-		const imported = await importComicVineIssue(user.id, issueId);
+		const imported = await importComicVineIssue(user.id, issueId, listId);
 		return json({ imported });
 	} catch (error) {
 		if (error instanceof ComicVineError) {

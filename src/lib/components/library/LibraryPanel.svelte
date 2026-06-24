@@ -59,7 +59,7 @@
 						aria-hidden="true"
 					>
 						<img
-							class="h-36 w-24 rounded-md border border-border object-cover"
+							class="h-36 w-24 border border-border object-cover"
 							src={transitionPreview.coverImageUrl ?? '/robots.txt'}
 							alt=""
 							style:view-transition-name={issueViewTransitionName(
@@ -86,7 +86,7 @@
 							onclick={() => prepareIssueTransition(issue, item.position)}
 						>
 							<img
-								class="h-36 w-24 rounded-md border border-border object-cover"
+								class="h-36 w-24 border border-border object-cover"
 								src={issue.coverImageUrl ?? '/robots.txt'}
 								alt=""
 								style:view-transition-name={isActiveIssueTransition(issue.id)

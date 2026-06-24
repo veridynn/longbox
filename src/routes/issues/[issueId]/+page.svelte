@@ -426,7 +426,7 @@
 			<div class="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
 				<aside class="space-y-4">
 					<img
-						class="aspect-[2/3] w-full rounded-lg border border-border object-cover"
+						class="aspect-[2/3] w-full border border-border object-cover"
 						src={coverImageUrl ?? '/robots.txt'}
 						alt=""
 						style:view-transition-name={coverInViewTransition

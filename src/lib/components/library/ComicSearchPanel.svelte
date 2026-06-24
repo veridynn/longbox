@@ -3,34 +3,46 @@
 	import { Check, LoaderCircle, Plus, Search } from '@lucide/svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { formatDate, issueTitle } from '$lib/comics/format';
-	import type { SearchIssue } from '$lib/comics/types';
+	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
 
 	type Props = {
 		addError: string | null;
 		addingIssueIds: number[];
+		addingUserIssueIds?: string[];
+		addedLabel?: string;
 		isInLibrary: (issue: SearchIssue) => boolean;
+		isLibraryItemAdded?: (item: LibraryItem) => boolean;
 		isSearching: boolean;
+		libraryItems?: LibraryItem[];
 		onAddIssue: (issue: SearchIssue) => void;
+		onAddLibraryItem?: (item: LibraryItem) => void;
 		onSearch: () => void;
 		open: boolean;
 		query: string;
 		resultLimit: number;
 		results: SearchIssue[];
 		searchError: string | null;
+		targetName?: string;
 	};
 
 	let {
 		addError,
 		addingIssueIds,
+		addingUserIssueIds = [],
+		addedLabel = 'Owned',
 		isInLibrary,
+		isLibraryItemAdded = () => false,
 		isSearching,
+		libraryItems = [],
 		onAddIssue,
+		onAddLibraryItem,
 		onSearch,
 		open = $bindable(),
 		query = $bindable(),
 		resultLimit,
 		results,
-		searchError
+		searchError,
+		targetName = 'Library'
 	}: Props = $props();
 
 	let searchInput = $state<HTMLInputElement | null>(null);
@@ -51,6 +63,14 @@
 			event.preventDefault();
 			onSearch();
 		}
+	}
+
+	function libraryItemTitle(item: LibraryItem) {
+		const issue = item.userIssue?.issue;
+		if (!issue) return 'Unknown issue';
+
+		const issueName = issue.name ? `: ${issue.name}` : '';
+		return `${issue.volume?.name ?? 'Unknown volume'} #${issue.issueNumber}${issueName}`;
 	}
 </script>
 
@@ -114,12 +134,62 @@
 	</div>
 
 	<Command.List class="max-h-[min(28rem,calc(100dvh-16rem))]">
-		{#if results.length}
+		{#if libraryItems.length || results.length}
+			{#if libraryItems.length}
+				<div class="px-3 pt-1 pb-2">
+					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Library</h3>
+				</div>
+				<ul class="divide-y divide-border border-b border-border">
+					{#each libraryItems as item (item.id)}
+						{@const issue = item.userIssue?.issue}
+						{@const userIssueId = item.userIssue?.id}
+						{#if issue && userIssueId}
+							<li class="flex gap-3 px-3 py-3">
+								<img
+									class="h-28 w-20 shrink-0 border border-border object-cover"
+									src={issue.coverImageUrl ?? '/robots.txt'}
+									alt=""
+								/>
+								<div class="min-w-0 flex-1">
+									<h4 class="line-clamp-2 text-sm font-semibold">{libraryItemTitle(item)}</h4>
+									<p class="mt-1 text-xs text-muted-foreground">
+										{formatDate(issue.coverDate)}
+									</p>
+								</div>
+								<button
+									type="button"
+									class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+									aria-label={isLibraryItemAdded(item)
+										? `${libraryItemTitle(item)} is already in ${targetName}`
+										: `Add ${libraryItemTitle(item)} to ${targetName}`}
+									disabled={addingUserIssueIds.includes(userIssueId) || isLibraryItemAdded(item)}
+									onclick={() => onAddLibraryItem?.(item)}
+								>
+									{#if addingUserIssueIds.includes(userIssueId)}
+										<LoaderCircle class="size-4 animate-spin" />
+									{:else if isLibraryItemAdded(item)}
+										<Check class="size-4" />
+										{addedLabel}
+									{:else}
+										<Plus class="size-4" />
+									{/if}
+								</button>
+							</li>
+						{/if}
+					{/each}
+				</ul>
+			{/if}
+
+			{#if results.length}
+				<div class="px-3 pt-3 pb-2">
+					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">ComicVine</h3>
+				</div>
+			{/if}
 			<ul class="divide-y divide-border">
 				{#each results as issue (issue.id)}
 					<li class="flex gap-3 px-3 py-3">
 						<img
-							class="h-28 w-20 shrink-0 rounded-md border border-border object-cover"
+							class="h-28 w-20 shrink-0 border border-border object-cover"
 							src={issue.coverImageUrl ?? '/robots.txt'}
 							alt=""
 						/>
@@ -143,8 +213,8 @@
 							type="button"
 							class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
 							aria-label={isInLibrary(issue)
-								? `${issueTitle(issue)} is already in Library`
-								: `Add ${issueTitle(issue)} to Library`}
+								? `${issueTitle(issue)} is already in ${targetName}`
+								: `Add ${issueTitle(issue)} to ${targetName}`}
 							disabled={addingIssueIds.includes(issue.id) || isInLibrary(issue)}
 							onclick={() => onAddIssue(issue)}
 						>
@@ -152,7 +222,7 @@
 								<LoaderCircle class="size-4 animate-spin" />
 							{:else if isInLibrary(issue)}
 								<Check class="size-4" />
-								Owned
+								{addedLabel}
 							{:else}
 								<Plus class="size-4" />
 							{/if}
