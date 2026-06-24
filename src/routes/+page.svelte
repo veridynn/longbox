@@ -5,6 +5,7 @@
 	import ComicSearchPanel from '$lib/components/library/ComicSearchPanel.svelte';
 	import LibraryPanel from '$lib/components/library/LibraryPanel.svelte';
 	import SaveAccountDialog from '$lib/components/library/SaveAccountDialog.svelte';
+	import StatsPanel from '$lib/components/library/StatsPanel.svelte';
 	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
 	import { db } from '$lib/db';
 
@@ -43,6 +44,19 @@
 				}
 			: null
 	);
+	const lists = db.useQuery(() =>
+		auth.user
+			? {
+					userLists: {
+						$: {
+							where: {
+								'owner.id': auth.user.id
+							}
+						}
+					}
+				}
+			: null
+	);
 
 	let query = $state('');
 	let results = $state<SearchIssue[]>([]);
@@ -74,6 +88,18 @@
 				.map((item) => item.userIssue?.issue?.comicVineId)
 				.filter((id): id is number => typeof id === 'number')
 		)
+	);
+	let favoriteCount = $derived(
+		libraryItems.filter((item) => item.userIssue?.favorite === true).length
+	);
+	let watchlistCount = $derived(
+		libraryItems.filter((item) => item.userIssue?.readStatus === 'unread').length
+	);
+	let readCount = $derived(
+		libraryItems.filter((item) => item.userIssue?.readStatus === 'read').length
+	);
+	let customListCount = $derived(
+		(lists.data?.userLists ?? []).filter((list) => list.name !== 'Library').length
 	);
 
 	function isInLibrary(issue: SearchIssue) {
@@ -360,6 +386,14 @@
 					onSubmitEmail={sendSaveAccountCode}
 				/>
 			{/if}
+
+			<StatsPanel
+				{favoriteCount}
+				issueCount={libraryItems.length}
+				listCount={customListCount}
+				{readCount}
+				{watchlistCount}
+			/>
 
 			<LibraryPanel
 				errorMessage={library.error?.message ?? null}
