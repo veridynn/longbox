@@ -6,8 +6,7 @@ Longbox is a local-first comic library for organizing a personal collection, kee
 
 ![svelte-typescript-vite-pnpm][tech-stack-icons]
 
-- `SvelteKit 2`
-- `Svelte 5`
+- `Svelte 5 / SvelteKit 2`
 - `TypeScript`
 - `Vite Plus`
 - `pnpm`
@@ -21,6 +20,12 @@ Longbox is a local-first comic library for organizing a personal collection, kee
 ```sh
 vp install && vpr dev
 ```
+
+## TODO
+
+- [ ] Disable caching for development enviorment so page refreshes always show the latest changes.
+- [x] Separate development and production databases.
+- [ ] Move agent documentation from `docs` to `.agents/docs`, including a new home for `docs/assets/longbox-logo.svg`.
 
 ## 📜 Scripts
 
