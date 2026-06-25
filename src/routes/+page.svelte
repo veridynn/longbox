@@ -132,9 +132,11 @@
 						.map((item) => item.userIssue?.issue?.coverImageUrl)
 						.filter((url): url is string => Boolean(url))
 						.slice(0, 5),
+					createdAt: list.createdAt,
 					id: list.id,
 					issueCount: list.items.length,
-					name: list.name
+					name: list.name,
+					updatedAt: list.updatedAt
 				})
 			);
 	});
@@ -211,6 +213,19 @@
 		} finally {
 			isCreatingList = false;
 		}
+	}
+
+	async function renameList(listId: string, name: string) {
+		await db.transact(
+			db.tx.userLists[listId].update({
+				name,
+				updatedAt: new Date()
+			})
+		);
+	}
+
+	async function deleteList(list: CustomListSummary) {
+		await db.transact(db.tx.userLists[list.id].delete());
 	}
 
 	function backToSaveAccountEmail() {
@@ -389,7 +404,7 @@
 	}
 
 	async function addIssue(issue: SearchIssue) {
-		if (isInLibrary(issue)) {
+		if (isInLibrary(issue) || addingIssueIds.includes(issue.id)) {
 			return;
 		}
 
@@ -502,7 +517,14 @@
 				{watchlistCount}
 			/>
 
-			<ListsPanel {customLists} onCreateList={openCreateList} />
+			<ListsPanel
+				{customLists}
+				errorMessage={lists.error?.message ?? null}
+				isLoading={lists.isLoading}
+				onCreateList={openCreateList}
+				onDeleteList={deleteList}
+				onRenameList={renameList}
+			/>
 
 			<LibraryPanel
 				errorMessage={library.error?.message ?? null}

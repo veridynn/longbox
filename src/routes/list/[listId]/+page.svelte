@@ -1,13 +1,21 @@
 <script lang="ts">
 	import { id } from '@instantdb/svelte';
-	import { ArrowLeft, LoaderCircle, Plus } from '@lucide/svelte';
+	import { ArrowLeft, LoaderCircle, Plus, Trash2 } from '@lucide/svelte';
 	import type { PageProps } from './$types';
 	import ComicSearchPanel from '$lib/components/library/ComicSearchPanel.svelte';
-	import { customListItemKey } from '$lib/components/library/lists';
-	import { formatDate } from '$lib/comics/format';
+	import DeleteListDialog from '$lib/components/library/DeleteListDialog.svelte';
+	import InlineListTitle from '$lib/components/library/InlineListTitle.svelte';
+	import ListIssueRows from '$lib/components/library/ListIssueRows.svelte';
+	import {
+		customListItemKey,
+		isDuplicateListItemError,
+		listHasLibraryItem,
+		listHasSearchIssue,
+		stableUserIssueKey
+	} from '$lib/components/library/lists';
 	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
-	import { issueViewTransitionName } from '$lib/comics/view-transitions.svelte';
 	import { db } from '$lib/db';
+	import { goto } from '$app/navigation';
 
 	type UserList = {
 		id: string;
@@ -81,6 +89,19 @@
 				}
 			: null
 	);
+	const allListsQuery = db.useQuery(() =>
+		auth.user
+			? {
+					userLists: {
+						$: {
+							where: {
+								'owner.id': auth.user.id
+							}
+						}
+					}
+				}
+			: null
+	);
 
 	let query = $state('');
 	let results = $state<SearchIssue[]>([]);
@@ -90,6 +111,11 @@
 	let searchOpen = $state(false);
 	let addingIssueIds = $state<number[]>([]);
 	let addingUserIssueIds = $state<string[]>([]);
+	let deleteListError = $state<string | null>(null);
+	let deleteListOpen = $state(false);
+	let isDeletingList = $state(false);
+	let listActionError = $state<string | null>(null);
+	let removingItemIds = $state<string[]>([]);
 
 	const currentList = $derived((listQuery.data?.userLists?.[0] as UserList | undefined) ?? null);
 	const listItems = $derived(
@@ -100,13 +126,6 @@
 			(item) => item.userIssue?.issue
 		)
 	);
-	const listComicVineIds = $derived(
-		new Set(
-			listItems
-				.map((item) => item.userIssue?.issue?.comicVineId)
-				.filter((issueId): issueId is number => typeof issueId === 'number')
-		)
-	);
 	const libraryItemByComicVineId = $derived(
 		new Map(
 			libraryItems
@@ -114,26 +133,18 @@
 				.filter((entry): entry is readonly [number, LibraryItem] => typeof entry[0] === 'number')
 		)
 	);
-
-	function issueTitle(item: LibraryItem) {
-		const issue = item.userIssue?.issue;
-		if (!issue) return 'Unknown issue';
-
-		const issueName = issue.name ? `: ${issue.name}` : '';
-		return `${issue.volume?.name ?? 'Unknown volume'} #${issue.issueNumber}${issueName}`;
-	}
+	const existingListNames = $derived((allListsQuery.data?.userLists ?? []).map((list) => list.name));
 
 	function openSearch() {
 		searchOpen = true;
 	}
 
 	function isSearchIssueInList(issue: SearchIssue) {
-		return listComicVineIds.has(issue.id);
+		return listHasSearchIssue(listItems, issue, addingIssueIds);
 	}
 
 	function isLibraryItemInList(item: LibraryItem) {
-		const comicVineId = item.userIssue?.issue?.comicVineId;
-		return typeof comicVineId === 'number' && listComicVineIds.has(comicVineId);
+		return listHasLibraryItem(listItems, item, addingUserIssueIds);
 	}
 
 	async function readJsonResponse(response: Response) {
@@ -177,8 +188,14 @@
 	async function addLibraryItem(item: LibraryItem) {
 		const list = currentList;
 		const userIssueId = item.userIssue?.id;
+		const comicVineId = item.userIssue?.issue?.comicVineId;
 
 		if (!list || !userIssueId || isLibraryItemInList(item)) {
+			return;
+		}
+
+		if (!auth.user || typeof comicVineId !== 'number') {
+			addError = 'This issue cannot be added to the list.';
 			return;
 		}
 
@@ -190,7 +207,10 @@
 				db.tx.userListItems[id()]
 					.update({
 						addedAt: new Date(),
-						listItemKey: customListItemKey(list.listKey, userIssueId),
+						listItemKey: customListItemKey(
+							list.listKey,
+							stableUserIssueKey(auth.user.id, comicVineId)
+						),
 						position: listItems.length
 					})
 					.link({
@@ -199,6 +219,10 @@
 					})
 			);
 		} catch (error) {
+			if (isDuplicateListItemError(error)) {
+				return;
+			}
+
 			addError = error instanceof Error ? error.message : 'Unable to add issue to this list.';
 		} finally {
 			addingUserIssueIds = addingUserIssueIds.filter((idValue) => idValue !== userIssueId);
@@ -245,6 +269,78 @@
 			addingIssueIds = addingIssueIds.filter((idValue) => idValue !== issue.id);
 		}
 	}
+
+	async function renameList(name: string) {
+		const list = currentList;
+		if (!list) return;
+
+		await db.transact(
+			db.tx.userLists[list.id].update({
+				name,
+				updatedAt: new Date()
+			})
+		);
+	}
+
+	function closeDeleteList() {
+		if (isDeletingList) return;
+
+		deleteListOpen = false;
+		deleteListError = null;
+	}
+
+	async function deleteList() {
+		const list = currentList;
+		if (!list || isDeletingList) return;
+
+		isDeletingList = true;
+		deleteListError = null;
+
+		try {
+			await db.transact(db.tx.userLists[list.id].delete());
+			await goto('/');
+		} catch (error) {
+			deleteListError = error instanceof Error ? error.message : 'Unable to delete this list.';
+		} finally {
+			isDeletingList = false;
+		}
+	}
+
+	async function removeListItem(itemId: string) {
+		if (removingItemIds.includes(itemId)) return;
+
+		listActionError = null;
+		removingItemIds = [...removingItemIds, itemId];
+
+		try {
+			await db.transact(db.tx.userListItems[itemId].delete());
+		} catch (error) {
+			listActionError = error instanceof Error ? error.message : 'Unable to remove this issue.';
+		} finally {
+			removingItemIds = removingItemIds.filter((idValue) => idValue !== itemId);
+		}
+	}
+
+	async function reorderListItems(orderedItems: LibraryItem[]) {
+		const list = currentList;
+		if (!list) return;
+
+		const positions = orderedItems
+			.map((item, position) => ({ id: item.id, position }))
+			.filter((item) => listItems.find((listItem) => listItem.id === item.id)?.position !== item.position);
+		if (!positions.length) return;
+
+		listActionError = null;
+
+		try {
+			await db.transact([
+				...positions.map((item) => db.tx.userListItems[item.id].update({ position: item.position })),
+				db.tx.userLists[list.id].update({ updatedAt: new Date() })
+			]);
+		} catch (error) {
+			listActionError = error instanceof Error ? error.message : 'Unable to reorder this list.';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -262,21 +358,47 @@
 					<ArrowLeft class="size-4" />
 					Library
 				</a>
-				<h1 class="mt-3 text-2xl font-semibold tracking-normal">
-					{currentList?.name ?? 'List'}
+				<h1 class="mt-3">
+					{#if currentList}
+						<InlineListTitle
+							class="text-2xl font-semibold tracking-normal"
+							existingNames={existingListNames}
+							isSubmitting={isDeletingList}
+							name={currentList.name}
+							onRename={renameList}
+						/>
+					{:else}
+						<span class="text-2xl font-semibold tracking-normal">List</span>
+					{/if}
 				</h1>
 				<p class="mt-1 text-sm text-muted-foreground">{listItems.length} issues</p>
+				{#if allListsQuery.error}
+					<p class="mt-2 text-sm text-destructive">{allListsQuery.error.message}</p>
+				{/if}
 			</div>
 
 			{#if auth.user && currentList}
-				<button
-					type="button"
-					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-					onclick={openSearch}
-				>
-					<Plus class="size-4" />
-					Add issues
-				</button>
+				<div class="flex flex-wrap gap-2">
+					<button
+						type="button"
+						class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+						onclick={openSearch}
+					>
+						<Plus class="size-4" />
+						Add issues
+					</button>
+					<button
+						type="button"
+						class="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-destructive hover:bg-destructive/10"
+						onclick={() => {
+							deleteListError = null;
+							deleteListOpen = true;
+						}}
+					>
+						<Trash2 class="size-4" />
+						Delete list
+					</button>
+				</div>
 			{/if}
 		</header>
 
@@ -298,68 +420,61 @@
 				List not found.
 			</p>
 		{:else}
-			<ComicSearchPanel
-				{addError}
-				{addingIssueIds}
-				{addingUserIssueIds}
-				addedLabel="Added"
-				bind:open={searchOpen}
-				bind:query
-				isInLibrary={isSearchIssueInList}
-				isLibraryItemAdded={isLibraryItemInList}
-				{isSearching}
-				{libraryItems}
-				onAddIssue={addIssue}
-				onAddLibraryItem={addLibraryItem}
-				onSearch={searchIssues}
-				resultLimit={12}
-				{results}
-				{searchError}
-				targetName={currentList.name}
-			/>
+			{#if libraryQuery.isLoading}
+				<div class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+					<LoaderCircle class="mr-2 inline size-4 animate-spin" />
+					Loading library issues
+				</div>
+			{:else if libraryQuery.error}
+				<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+					{libraryQuery.error.message}
+				</p>
+			{:else}
+				<ComicSearchPanel
+					{addError}
+					{addingIssueIds}
+					{addingUserIssueIds}
+					addedLabel="Added"
+					bind:open={searchOpen}
+					bind:query
+					isInLibrary={isSearchIssueInList}
+					isLibraryItemAdded={isLibraryItemInList}
+					{isSearching}
+					{libraryItems}
+					onAddIssue={addIssue}
+					onAddLibraryItem={addLibraryItem}
+					onSearch={searchIssues}
+					resultLimit={12}
+					{results}
+					{searchError}
+					targetName={currentList.name}
+				/>
+			{/if}
 
+			{#if listActionError}
+				<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+					{listActionError}
+				</p>
+			{/if}
 			<section class="overflow-hidden rounded-lg border border-border bg-card">
 				<div class="flex items-center justify-between border-b border-border px-4 py-3">
-					<h2 class="font-semibold">{currentList.name}</h2>
+					<InlineListTitle
+						class="font-semibold"
+						existingNames={existingListNames}
+						isSubmitting={isDeletingList}
+						name={currentList.name}
+						onRename={renameList}
+					/>
 					<span class="text-sm text-muted-foreground">{listItems.length} issues</span>
 				</div>
 
 				{#if listItems.length}
-					<ul class="divide-y divide-border">
-						{#each listItems as item (item.id)}
-							{@const issue = item.userIssue?.issue}
-							{#if issue}
-								<li class="grid gap-4 p-4 sm:grid-cols-[6rem_minmax(0,1fr)]">
-									<img
-										class="h-36 w-24 border border-border object-cover"
-										src={issue.coverImageUrl ?? '/robots.txt'}
-										alt=""
-										style:view-transition-name={issueViewTransitionName(issue.id, 'cover')}
-									/>
-									<div class="min-w-0">
-										<h3
-											class="text-base font-semibold"
-											style:view-transition-name={issueViewTransitionName(issue.id, 'title')}
-										>
-											<a class="underline-offset-4 hover:underline" href={`/issues/${issue.id}`}>
-												{issueTitle(item)}
-											</a>
-										</h3>
-										<p class="mt-1 text-sm text-muted-foreground">
-											{issue.volume?.publisher?.name ?? 'Unknown publisher'} · {formatDate(
-												issue.coverDate
-											)}
-										</p>
-										{#if issue.summary}
-											<p class="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
-												{issue.summary}
-											</p>
-										{/if}
-									</div>
-								</li>
-							{/if}
-						{/each}
-					</ul>
+					<ListIssueRows
+						items={listItems}
+						onRemoveListItem={removeListItem}
+						onReorderListItems={reorderListItems}
+						{removingItemIds}
+					/>
 				{:else}
 					<div class="grid gap-3 px-4 py-12 text-center">
 						<p class="text-sm text-muted-foreground">
@@ -379,3 +494,14 @@
 		{/if}
 	</section>
 </main>
+
+{#if currentList}
+	<DeleteListDialog
+		errorMessage={deleteListError}
+		isSubmitting={isDeletingList}
+		listName={currentList.name}
+		bind:open={deleteListOpen}
+		onCancel={closeDeleteList}
+		onConfirm={deleteList}
+	/>
+{/if}

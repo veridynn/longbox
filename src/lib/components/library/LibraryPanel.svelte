@@ -9,7 +9,7 @@
 		issueTransition,
 		issueViewTransitionName,
 		primeIssueTransition
-	} from '$lib/comics/view-transitions.svelte';
+	} from '$lib/comics/view-transitions.svelte.ts';
 
 	type Props = {
 		errorMessage: string | null;

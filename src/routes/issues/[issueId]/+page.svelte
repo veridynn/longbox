@@ -28,7 +28,7 @@
 		isActiveIssueTransition,
 		issueViewTransitionName,
 		primeIssueTransition
-	} from '$lib/comics/view-transitions.svelte';
+	} from '$lib/comics/view-transitions.svelte.ts';
 	import { db } from '$lib/db';
 
 	type DetailUserIssue = {

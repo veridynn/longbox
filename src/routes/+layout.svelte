@@ -8,7 +8,7 @@
 		clearIssueTransition,
 		issueTransitionDirection,
 		markIssueTransitionIncoming
-	} from '$lib/comics/view-transitions.svelte';
+	} from '$lib/comics/view-transitions.svelte.ts';
 
 	let { children } = $props();
 	let activeViewTransition: ViewTransition | null = null;

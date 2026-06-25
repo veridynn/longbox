@@ -4,7 +4,7 @@ import {
 	issueTransitionDirection,
 	issueTransitionIssueId,
 	issueViewTransitionName
-} from './view-transitions.svelte';
+} from './view-transitions.svelte.ts';
 
 function navigation(from: string, to: string) {
 	return {

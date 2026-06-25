@@ -17,6 +17,7 @@
 	"dependencies": {
 		"@instantdb/admin": "^1.0.39",
 		"@instantdb/svelte": "^1.0.39",
+		"@thisux/sveltednd": "^0.4.1",
 		"bits-ui": "^2.18.1",
 		"runed": "^0.37.1"
 	},

@@ -24,6 +24,9 @@ importers:
       '@instantdb/svelte':
         specifier: ^1.0.39
         version: 1.0.39(svelte@5.55.9(@typescript-eslint/types@8.59.4))
+      '@thisux/sveltednd':
+        specifier: ^0.4.1
+        version: 0.4.1(svelte@5.55.9(@typescript-eslint/types@8.59.4))
       bits-ui:
         specifier: ^2.18.1
         version: 2.18.1(@internationalized/date@3.12.1)(@sveltejs/kit@2.61.1(@sveltejs/vite-plugin-svelte@7.1.2(@voidzero-dev/vite-plus-core@0.1.22(@types/node@24.12.4)(jiti@2.7.0)(typescript@6.0.3))(svelte@5.55.9(@typescript-eslint/types@8.59.4)))(@voidzero-dev/vite-plus-core@0.1.22(@types/node@24.12.4)(jiti@2.7.0)(typescript@6.0.3))(svelte@5.55.9(@typescript-eslint/types@8.59.4))(typescript@6.0.3))(svelte@5.55.9(@typescript-eslint/types@8.59.4))
@@ -789,6 +792,11 @@ packages:
     engines: {node: '>=16'}
     peerDependencies:
       svelte: ^3 || ^4 || ^5 || ^5.0.0-next.0
+
+  '@thisux/sveltednd@0.4.1':
+    resolution: {integrity: sha512-qRcwstSmYOoGD9h0hPDI6Tm4nBXeMJpCs3vrOhnImi1ObL/D2ScfAmIbL9bMN1l2V51AVvD5l/G/ZJkx8iRbTA==}
+    peerDependencies:
+      svelte: ^5.0.0
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -2003,6 +2011,10 @@ snapshots:
       vite: '@voidzero-dev/vite-plus-core@0.1.22(@types/node@24.12.4)(jiti@2.7.0)(typescript@6.0.3)'
 
   '@testing-library/svelte-core@1.0.0(svelte@5.55.9(@typescript-eslint/types@8.59.4))':
+    dependencies:
+      svelte: 5.55.9(@typescript-eslint/types@8.59.4)
+
+  '@thisux/sveltednd@0.4.1(svelte@5.55.9(@typescript-eslint/types@8.59.4))':
     dependencies:
       svelte: 5.55.9(@typescript-eslint/types@8.59.4)
 
