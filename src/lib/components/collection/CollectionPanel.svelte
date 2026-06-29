@@ -8,10 +8,20 @@
 		isLoading: boolean;
 		items: CollectionItem[];
 		onAddIssue: () => void;
+		onRemoveIssue?: (itemId: string) => void | Promise<void>;
 		onReorderItems?: (items: CollectionItem[]) => void | Promise<void>;
+		removingItemIds?: string[];
 	};
 
-	let { errorMessage, isLoading, items, onAddIssue, onReorderItems }: Props = $props();
+	let {
+		errorMessage,
+		isLoading,
+		items,
+		onAddIssue,
+		onRemoveIssue,
+		onReorderItems,
+		removingItemIds = []
+	}: Props = $props();
 	let searchQuery = $state('');
 	let viewMode = $state<IssueListViewMode>('gallery');
 	const filteredItems = $derived(
@@ -49,7 +59,9 @@
 	{errorMessage}
 	{isLoading}
 	items={filteredItems}
+	onRemoveListItem={onRemoveIssue}
 	onReorderItems={onReorderItems ? reorderItems : undefined}
+	{removingItemIds}
 	{viewMode}
 	onViewModeChange={(nextViewMode) => {
 		viewMode = nextViewMode;

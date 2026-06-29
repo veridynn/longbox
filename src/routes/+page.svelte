@@ -89,6 +89,7 @@
 	let createListError = $state<string | null>(null);
 	let isCreatingList = $state(false);
 	let collectionActionError = $state<string | null>(null);
+	let removingCollectionIssueIds = $state<string[]>([]);
 
 	let collectionItems = $derived.by(() =>
 		(collection.data?.userIssues ?? [])
@@ -222,6 +223,22 @@
 
 	async function deleteList(list: CustomListSummary) {
 		await db.transact(db.tx.userLists[list.id].delete());
+	}
+
+	async function removeCollectionIssue(itemId: string) {
+		if (removingCollectionIssueIds.includes(itemId)) return;
+
+		collectionActionError = null;
+		removingCollectionIssueIds = [...removingCollectionIssueIds, itemId];
+
+		try {
+			await db.transact(db.tx.userIssues[itemId].delete());
+		} catch (error) {
+			collectionActionError =
+				error instanceof Error ? error.message : 'Unable to remove this issue.';
+		} finally {
+			removingCollectionIssueIds = removingCollectionIssueIds.filter((id) => id !== itemId);
+		}
 	}
 
 	function backToSaveAccountEmail() {
@@ -527,6 +544,8 @@
 				isLoading={collection.isLoading}
 				items={collectionItems}
 				onAddIssue={openSearch}
+				onRemoveIssue={removeCollectionIssue}
+				removingItemIds={removingCollectionIssueIds}
 			/>
 		{/if}
 	</section>

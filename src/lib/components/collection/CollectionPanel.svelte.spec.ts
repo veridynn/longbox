@@ -23,11 +23,13 @@ const items = [
 
 describe('CollectionPanel', () => {
 	it('renders the shared issue view without list-management controls', async () => {
+		const onRemoveIssue = vi.fn();
 		render(CollectionPanel, {
 			errorMessage: null,
 			isLoading: false,
 			items,
-			onAddIssue: vi.fn()
+			onAddIssue: vi.fn(),
+			onRemoveIssue
 		});
 
 		await expect.element(page.getByLabelText('View mode')).toBeInTheDocument();
@@ -35,7 +37,8 @@ describe('CollectionPanel', () => {
 		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();
 		await page.getByRole('button', { name: 'List view' }).click();
 		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
-		expect(page.getByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+		await page.getByRole('button', { name: 'Remove' }).click();
+		expect(onRemoveIssue).toHaveBeenCalledWith('item-1');
 	});
 
 	it('prompts users to add their first issue when empty', async () => {
