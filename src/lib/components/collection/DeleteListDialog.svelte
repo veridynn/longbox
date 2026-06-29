@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoaderCircle, Trash2 } from '@lucide/svelte';
+	import { Check, Copy, LoaderCircle, Trash2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 
 	type Props = {
@@ -21,11 +21,13 @@
 	}: Props = $props();
 
 	let confirmationName = $state('');
+	let copied = $state(false);
 	const canDelete = $derived(confirmationName === listName && !isSubmitting);
 
 	$effect(() => {
 		if (!open) {
 			confirmationName = '';
+			copied = false;
 		}
 	});
 
@@ -34,6 +36,14 @@
 		if (canDelete) {
 			onConfirm();
 		}
+	}
+
+	async function copyListName() {
+		await navigator.clipboard?.writeText(listName);
+		copied = true;
+		window.setTimeout(() => {
+			copied = false;
+		}, 1200);
 	}
 </script>
 
@@ -48,7 +58,17 @@
 
 		<form class="grid gap-4" onsubmit={handleSubmit}>
 			<p class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-				Type <span class="font-medium">{listName}</span> to confirm deletion.
+				Type
+				<button
+					type="button"
+					class="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-xs text-destructive hover:bg-destructive/15"
+					aria-label={`Copy ${listName}`}
+					onclick={copyListName}
+				>
+					{listName}
+					{#if copied}<Check class="size-3" />{:else}<Copy class="size-3" />{/if}
+				</button>
+				to confirm deletion.
 			</p>
 
 			<div class="grid gap-2">
@@ -79,7 +99,7 @@
 				</button>
 				<button
 					type="submit"
-					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-destructive/10 px-4 text-sm font-medium text-destructive hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-70"
+					class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-destructive/10 px-4 text-sm font-medium text-destructive hover:bg-destructive/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
 					disabled={!canDelete}
 				>
 					{#if isSubmitting}<LoaderCircle class="size-4 animate-spin" />{:else}<Trash2 class="size-4" />{/if}

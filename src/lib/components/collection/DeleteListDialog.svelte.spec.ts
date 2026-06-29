@@ -4,6 +4,27 @@ import { render } from 'vitest-browser-svelte';
 import DeleteListDialog from './DeleteListDialog.svelte';
 
 describe('DeleteListDialog', () => {
+	it('copies the list name from the inline prompt', async () => {
+		const writeText = vi.fn();
+		Object.defineProperty(navigator, 'clipboard', {
+			configurable: true,
+			value: { writeText }
+		});
+
+		render(DeleteListDialog, {
+			errorMessage: null,
+			isSubmitting: false,
+			listName: 'To read',
+			onCancel: vi.fn(),
+			onConfirm: vi.fn(),
+			open: true
+		});
+
+		await page.getByRole('button', { name: 'Copy To read' }).click();
+
+		expect(writeText).toHaveBeenCalledWith('To read');
+	});
+
 	it('requires the exact list name before deleting', async () => {
 		const onConfirm = vi.fn();
 		render(DeleteListDialog, {
