@@ -13,7 +13,7 @@ export type SearchIssue = {
 
 export type CollectionItem = {
 	id: string;
-	position: number;
+	position?: number;
 	userIssue?: {
 		id: string;
 		acquiredAt?: Date | null;

@@ -188,41 +188,53 @@
 			{/each}
 		</ul>
 	{:else}
-		<ul class="divide-y divide-border">
-			{#each items as item, index (item.id)}
-				<li
-					use:draggable={{
-						container: 'issue-list-panel',
-						dragData: item,
-						handle: '[data-list-drag-handle]',
-						attributes: { draggingClass: 'opacity-80' }
-					}}
-					use:droppable={{
-						container: String(index),
-						direction: 'vertical',
-						callbacks: { onDrop: handleDrop },
-						attributes: {
-							dragOverClass: onReorderItems
-								? 'outline outline-2 outline-dashed outline-primary/60 outline-offset-[-2px]'
-								: ''
-						}
-					}}
-					animate:flip={{ duration: 160 }}
-					class={`grid gap-4 bg-background transition ${
-						onReorderItems
-							? 'sm:grid-cols-[auto_6rem_minmax(0,1fr)_auto]'
-							: 'px-4 sm:grid-cols-[6rem_minmax(0,1fr)]'
-					}`}
-				>
-					<SortableListIssueRow
-						canReorder={Boolean(onReorderItems)}
-						{item}
-						{onRemoveListItem}
-						{removingItemIds}
-					/>
-				</li>
-			{/each}
-		</ul>
+		{#if onReorderItems}
+			<ul class="divide-y divide-border">
+				{#each items as item, index (item.id)}
+					<li
+						use:draggable={{
+							container: 'issue-list-panel',
+							dragData: item,
+							handle: '[data-list-drag-handle]',
+							attributes: { draggingClass: 'opacity-80' }
+						}}
+						use:droppable={{
+							container: String(index),
+							direction: 'vertical',
+							callbacks: { onDrop: handleDrop },
+							attributes: {
+								dragOverClass: 'outline outline-2 outline-dashed outline-primary/60 outline-offset-[-2px]'
+							}
+						}}
+						animate:flip={{ duration: 160 }}
+						class="grid gap-4 bg-background transition sm:grid-cols-[auto_6rem_minmax(0,1fr)_auto]"
+					>
+						<SortableListIssueRow
+							canReorder
+							{item}
+							{onRemoveListItem}
+							{removingItemIds}
+						/>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<ul class="divide-y divide-border">
+				{#each items as item (item.id)}
+					<li
+						animate:flip={{ duration: 160 }}
+						class="grid gap-4 bg-background px-4 transition sm:grid-cols-[6rem_minmax(0,1fr)]"
+					>
+						<SortableListIssueRow
+							canReorder={false}
+							{item}
+							{onRemoveListItem}
+							{removingItemIds}
+						/>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	{/if}
 </section>
 

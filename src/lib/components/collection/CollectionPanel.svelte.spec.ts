@@ -27,14 +27,32 @@ describe('CollectionPanel', () => {
 			errorMessage: null,
 			isLoading: false,
 			items,
-			onReorderItems: vi.fn()
+			onAddIssue: vi.fn()
 		});
 
 		await expect.element(page.getByLabelText('View mode')).toBeInTheDocument();
 		await expect.element(page.getByLabelText('Search collection')).toBeInTheDocument();
 		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();
 		await page.getByRole('button', { name: 'List view' }).click();
-		await expect.element(page.getByRole('button', { name: /Drag Saga #1/ })).toBeInTheDocument();
+		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
 		expect(page.getByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
+	});
+
+	it('prompts users to add their first issue when empty', async () => {
+		const onAddIssue = vi.fn();
+		render(CollectionPanel, {
+			errorMessage: null,
+			isLoading: false,
+			items: [],
+			onAddIssue
+		});
+
+		await expect.element(page.getByText('Your collection is empty')).toBeInTheDocument();
+		await expect
+			.element(page.getByText('Add your first issue to start building your collection.'))
+			.toBeInTheDocument();
+		await page.getByRole('button', { name: 'Add first issue' }).click();
+
+		expect(onAddIssue).toHaveBeenCalledOnce();
 	});
 });

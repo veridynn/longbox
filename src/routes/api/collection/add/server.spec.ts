@@ -7,8 +7,6 @@ vi.mock('$lib/server/collection-import', () => ({
 	verifyInstantToken: vi.fn()
 }));
 
-const COLLECTION_ITEM_KEY = 'collection-item-key';
-
 describe('POST /api/collection/add', () => {
 	beforeEach(() => {
 		vi.mocked(importComicVineIssue).mockReset();
@@ -52,8 +50,7 @@ describe('POST /api/collection/add', () => {
 		vi.mocked(importComicVineIssue).mockResolvedValue({
 			alreadyInCollection: false,
 			issueId: '123',
-			userIssueKey: 'user-1:comicvine:123',
-			listItemKey: COLLECTION_ITEM_KEY
+			userIssueKey: 'user-1:comicvine:123'
 		});
 
 		const response = await POST({
@@ -74,8 +71,7 @@ describe('POST /api/collection/add', () => {
 			imported: {
 				alreadyInCollection: false,
 				issueId: '123',
-				userIssueKey: 'user-1:comicvine:123',
-				listItemKey: COLLECTION_ITEM_KEY
+				userIssueKey: 'user-1:comicvine:123'
 			}
 		});
 	});
@@ -90,8 +86,7 @@ describe('POST /api/collection/add', () => {
 		vi.mocked(importComicVineIssue).mockResolvedValue({
 			alreadyInCollection: false,
 			issueId: '123',
-			userIssueKey: 'user-1:comicvine:123',
-			listItemKey: COLLECTION_ITEM_KEY
+			userIssueKey: 'user-1:comicvine:123'
 		});
 
 		const response = await POST({

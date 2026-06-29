@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getComicVineIssue, getComicVineVolume } from '$lib/server/comicvine';
 import { getAdminDb } from '$lib/server/instant-admin';
-import { collectionItemKey } from '$lib/server/import-keys';
 import { importComicVineIssue } from './collection-import';
 
 vi.mock('$lib/server/comicvine', () => ({
@@ -100,8 +99,8 @@ describe('importComicVineIssue', () => {
 
 	it('short-circuits duplicate collection adds before fetching ComicVine', async () => {
 		const { db } = createAdminDb((queryShape) => {
-			if ('userListItems' in queryShape) {
-				return { userListItems: [{ position: 7 }] };
+			if ('userIssues' in queryShape) {
+				return { userIssues: [{ id: 'existing-user-issue' }] };
 			}
 
 			return {};
@@ -112,8 +111,7 @@ describe('importComicVineIssue', () => {
 		await expect(importComicVineIssue('user-1', 123)).resolves.toEqual({
 			alreadyInCollection: true,
 			issueId: '123',
-			userIssueKey: 'user-1:comicvine:123',
-			listItemKey: collectionItemKey('user-1', 123)
+			userIssueKey: 'user-1:comicvine:123'
 		});
 
 		expect(getComicVineIssue).not.toHaveBeenCalled();
@@ -121,18 +119,59 @@ describe('importComicVineIssue', () => {
 		expect(db.transact).not.toHaveBeenCalled();
 	});
 
-	it('does not reset existing user issue fields when adding it to the collection list', async () => {
+	it('adds an existing collection issue to a custom list without re-importing it', async () => {
 		const { db, updates } = createAdminDb((queryShape) => {
-			if ('userListItems' in queryShape) {
-				return { userListItems: [] };
+			if ('userLists' in queryShape) {
+				return {
+					userLists: [
+						{
+							id: 'list-1',
+							items: [],
+							listKey: 'user-1:custom:list-1',
+							name: 'Pull list'
+						}
+					]
+				};
 			}
 
 			if ('userIssues' in queryShape) {
 				return { userIssues: [{ id: 'existing-user-issue' }] };
 			}
 
-			if ('userLists' in queryShape) {
-				return { userLists: [{ name: 'Collection', items: [] }] };
+			if ('userListItems' in queryShape) {
+				return { userListItems: [] };
+			}
+
+			return {};
+		});
+
+		vi.mocked(getAdminDb).mockReturnValue(db as never);
+
+		await expect(importComicVineIssue('user-1', 123, 'list-1')).resolves.toEqual({
+			alreadyInCollection: true,
+			issueId: '123',
+			userIssueKey: 'user-1:comicvine:123'
+		});
+
+		expect(getComicVineIssue).not.toHaveBeenCalled();
+		expect(getComicVineVolume).not.toHaveBeenCalled();
+		expect(updates).toEqual([
+			{
+				namespace: 'userListItems',
+				payload: {
+					addedAt: expect.any(Date),
+					listItemKey: 'user-1:custom:list-1:userIssue:user-1:comicvine:123',
+					position: 0
+				}
+			}
+		]);
+		expect(db.transact).toHaveBeenCalledOnce();
+	});
+
+	it('creates an owned collection issue on first import', async () => {
+		const { db, updates } = createAdminDb((queryShape) => {
+			if ('userIssues' in queryShape) {
+				return { userIssues: [] };
 			}
 
 			return {};
@@ -150,11 +189,12 @@ describe('importComicVineIssue', () => {
 		const userIssueUpdate = updates.find((update) => update.namespace === 'userIssues');
 
 		expect(userIssueUpdate?.payload).toEqual({
+			createdAt: expect.any(Date),
+			favorite: false,
 			owned: true,
+			readStatus: 'unread',
 			updatedAt: expect.any(Date)
 		});
-		expect(userIssueUpdate?.payload).not.toHaveProperty('favorite');
-		expect(userIssueUpdate?.payload).not.toHaveProperty('readStatus');
 		expect(userIssueUpdate?.payload).not.toHaveProperty('rating');
 		expect(db.transact).toHaveBeenCalledOnce();
 	});

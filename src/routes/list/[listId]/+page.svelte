@@ -16,7 +16,6 @@
 		stableUserIssueKey
 	} from '$lib/components/collection/lists';
 	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
-	import { COLLECTION_NAME } from '$lib/collection';
 	import { db } from '$lib/db';
 	import { goto } from '$app/navigation';
 
@@ -67,24 +66,15 @@
 	const collectionQuery = db.useQuery(() =>
 		auth.user
 			? {
-					userLists: {
+					userIssues: {
 						$: {
 							where: {
 								'owner.id': auth.user.id
 							}
 						},
-						items: {
-							$: {
-								order: {
-									position: 'asc'
-								}
-							},
-							userIssue: {
-								issue: {
-									volume: {
-										publisher: {}
-									}
-								}
+						issue: {
+							volume: {
+								publisher: {}
 							}
 						}
 					}
@@ -134,12 +124,14 @@
 			: listItems
 	);
 	const collectionItems = $derived(
-		(
-			(collectionQuery.data?.userLists?.find((list) => list.name === COLLECTION_NAME)
-				?.items ?? []) as CollectionItem[]
-		).filter(
-			(item) => item.userIssue?.issue
-		)
+		(collectionQuery.data?.userIssues ?? [])
+			.filter((userIssue) => userIssue.issue)
+			.map(
+				(userIssue): CollectionItem => ({
+					id: userIssue.id,
+					userIssue
+				})
+			)
 	);
 	const collectionItemByComicVineId = $derived(
 		new Map(

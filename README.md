@@ -44,6 +44,10 @@ vp install && vpr dev
   - [x] add search
   - [ ] add sorts (including cutome user reorder)
 
+## BUGS
+
+- [ ] tabing out of delete dialog closes it (should be trapped in dialog)
+
 ## 📜 Scripts
 
 ### Development server

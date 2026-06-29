@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Search } from '@lucide/svelte';
+	import { Plus, Search } from '@lucide/svelte';
 	import IssueListPanel, { type IssueListViewMode } from './IssueListPanel.svelte';
 	import type { CollectionItem } from '$lib/comics/types';
 
@@ -7,10 +7,11 @@
 		errorMessage: string | null;
 		isLoading: boolean;
 		items: CollectionItem[];
+		onAddIssue: () => void;
 		onReorderItems?: (items: CollectionItem[]) => void | Promise<void>;
 	};
 
-	let { errorMessage, isLoading, items, onReorderItems }: Props = $props();
+	let { errorMessage, isLoading, items, onAddIssue, onReorderItems }: Props = $props();
 	let searchQuery = $state('');
 	let viewMode = $state<IssueListViewMode>('gallery');
 	const filteredItems = $derived(
@@ -89,8 +90,21 @@
 	{/snippet}
 
 	{#snippet empty()}
-		<p class="px-4 py-12 text-center text-sm text-muted-foreground">
-			Added ComicVine issues will appear here with publisher, volume, characters, and credits.
-		</p>
+		<div class="grid gap-3 px-4 py-12 text-center">
+			<div class="grid gap-1">
+				<h2 class="text-base font-semibold">Your collection is empty</h2>
+				<p class="text-sm text-muted-foreground">
+					Add your first issue to start building your collection.
+				</p>
+			</div>
+			<button
+				type="button"
+				class="mx-auto inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+				onclick={onAddIssue}
+			>
+				<Plus class="size-4" />
+				Add first issue
+			</button>
+		</div>
 	{/snippet}
 </IssueListPanel>

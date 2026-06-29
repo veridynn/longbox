@@ -7,9 +7,6 @@ import {
 } from '$lib/server/comicvine';
 import { COLLECTION_NAME } from '$lib/collection';
 import {
-	collectionItemKey,
-	collectionListKey,
-	collectionName,
 	creditKey,
 	issueCharacterKey,
 	recordIdForKey,
@@ -20,7 +17,6 @@ type ImportedIssue = {
 	issueId: string;
 	alreadyInCollection: boolean;
 	userIssueKey: string;
-	listItemKey: string;
 };
 
 type TargetList = {
@@ -39,23 +35,6 @@ function parseDate(value: string | null) {
 
 function firstName(...values: Array<string | null | undefined>) {
 	return values.find((value) => value && value.trim()) ?? 'Unknown';
-}
-
-async function nextCollectionPosition(ownerId: string) {
-	const adminDb = getAdminDb();
-	const data = await adminDb.query({
-		userLists: {
-			$: {
-				where: {
-					'owner.id': ownerId
-				}
-			},
-			items: {}
-		}
-	});
-	const collectionList = data.userLists.find((list) => list.name === COLLECTION_NAME);
-
-	return collectionList?.items?.length ?? 0;
 }
 
 async function existingListItem(listItemKeyValue: string) {
@@ -145,11 +124,10 @@ export async function importComicVineIssue(
 ): Promise<ImportedIssue> {
 	const adminDb = getAdminDb();
 	const inputUserIssueKey = userIssueKey(ownerId, issueComicVineId);
-	const inputListItemKey = collectionItemKey(ownerId, issueComicVineId);
 	const targetList = targetListId ? await ownedCustomList(ownerId, targetListId) : null;
-	const currentListItem = await existingListItem(inputListItemKey);
+	const currentUserIssue = await existingUserIssue(inputUserIssueKey);
 
-	if (currentListItem) {
+	if (currentUserIssue) {
 		if (targetList) {
 			await addUserIssueKeyToList(targetList, inputUserIssueKey);
 		}
@@ -157,8 +135,7 @@ export async function importComicVineIssue(
 		return {
 			issueId: String(issueComicVineId),
 			alreadyInCollection: true,
-			userIssueKey: inputUserIssueKey,
-			listItemKey: inputListItemKey
+			userIssueKey: inputUserIssueKey
 		};
 	}
 
@@ -168,23 +145,9 @@ export async function importComicVineIssue(
 
 	const publisher = volume?.publisher;
 	const stableUserIssueKey = userIssueKey(ownerId, issue.id);
-	const stableListItemKey = collectionItemKey(ownerId, issue.id);
-	const stableListKey = collectionListKey(ownerId);
-	const stableListId = recordIdForKey(stableListKey);
-	const currentUserIssue = await existingUserIssue(stableUserIssueKey);
-	const position = await nextCollectionPosition(ownerId);
 	type TransactionInput = Parameters<typeof adminDb.transact>[0];
 
-	const transactions: Exclude<TransactionInput, readonly unknown[]>[] = [
-		adminDb.tx.userLists[stableListId]
-			.update({
-				createdAt: now,
-				listKey: stableListKey,
-				name: collectionName(),
-				updatedAt: now
-			})
-			.link({ owner: ownerId })
-	];
+	const transactions: Exclude<TransactionInput, readonly unknown[]>[] = [];
 
 	if (publisher) {
 		transactions.push(
@@ -265,32 +228,16 @@ export async function importComicVineIssue(
 
 	transactions.push(
 		adminDb.tx.userIssues[lookup('userIssueKey', stableUserIssueKey)]
-			.update(
-				currentUserIssue
-					? {
-							owned: true,
-							updatedAt: now
-						}
-					: {
-							createdAt: now,
-							favorite: false,
-							owned: true,
-							readStatus: 'unread',
-							updatedAt: now
-						}
-			)
+			.update({
+				createdAt: now,
+				favorite: false,
+				owned: true,
+				readStatus: 'unread',
+				updatedAt: now
+			})
 			.link({
 				owner: ownerId,
 				issue: lookup('comicVineId', issue.id)
-			}),
-		adminDb.tx.userListItems[lookup('listItemKey', stableListItemKey)]
-			.update({
-				addedAt: now,
-				position
-			})
-			.link({
-				list: stableListId,
-				userIssue: lookup('userIssueKey', stableUserIssueKey)
 			})
 	);
 
@@ -303,8 +250,7 @@ export async function importComicVineIssue(
 	return {
 		issueId: String(issue.id),
 		alreadyInCollection: false,
-		userIssueKey: stableUserIssueKey,
-		listItemKey: stableListItemKey
+		userIssueKey: stableUserIssueKey
 	};
 }
 

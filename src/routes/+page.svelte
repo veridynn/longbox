@@ -22,30 +22,21 @@
 	const collection = db.useQuery(() =>
 		auth.user
 			? {
-					userLists: {
+					userIssues: {
 						$: {
 							where: {
 								'owner.id': auth.user.id
 							}
 						},
-						items: {
-							$: {
-								order: {
-									position: 'asc'
-								}
+						issue: {
+							volume: {
+								publisher: {}
 							},
-							userIssue: {
-								issue: {
-									volume: {
-										publisher: {}
-									},
-									issueCharacters: {
-										character: {}
-									},
-									credits: {
-										person: {}
-									}
-								}
+							issueCharacters: {
+								character: {}
+							},
+							credits: {
+								person: {}
 							}
 						}
 					}
@@ -75,7 +66,6 @@
 				}
 			: null
 	);
-
 	let query = $state('');
 	let results = $state<SearchIssue[]>([]);
 	let searchError = $state<string | null>(null);
@@ -100,11 +90,15 @@
 	let isCreatingList = $state(false);
 	let collectionActionError = $state<string | null>(null);
 
-	let collectionList = $derived(
-		collection.data?.userLists?.find((list) => list.name === COLLECTION_NAME) ?? null
-	);
-	let collectionItems = $derived(
-		((collectionList?.items ?? []) as CollectionItem[]).filter((item) => item.userIssue?.issue)
+	let collectionItems = $derived.by(() =>
+		(collection.data?.userIssues ?? [])
+			.filter((userIssue) => userIssue.issue)
+			.map(
+				(userIssue): CollectionItem => ({
+					id: userIssue.id,
+					userIssue
+				})
+			)
 	);
 	let collectionComicVineIds = $derived(
 		new Set(
@@ -228,29 +222,6 @@
 
 	async function deleteList(list: CustomListSummary) {
 		await db.transact(db.tx.userLists[list.id].delete());
-	}
-
-	async function reorderCollectionItems(orderedItems: CollectionItem[]) {
-		if (!collectionList) return;
-
-		const positions = orderedItems
-			.map((item, position) => ({ id: item.id, position }))
-			.filter(
-				(item) => collectionItems.find((collectionItem) => collectionItem.id === item.id)?.position !== item.position
-			);
-		if (!positions.length) return;
-
-		collectionActionError = null;
-
-		try {
-			await db.transact([
-				...positions.map((item) => db.tx.userListItems[item.id].update({ position: item.position })),
-				db.tx.userLists[collectionList.id].update({ updatedAt: new Date() })
-			]);
-		} catch (error) {
-			collectionActionError =
-				error instanceof Error ? error.message : 'Unable to reorder your collection.';
-		}
 	}
 
 	function backToSaveAccountEmail() {
@@ -555,7 +526,7 @@
 				errorMessage={collectionActionError ?? collection.error?.message ?? null}
 				isLoading={collection.isLoading}
 				items={collectionItems}
-				onReorderItems={reorderCollectionItems}
+				onAddIssue={openSearch}
 			/>
 		{/if}
 	</section>
