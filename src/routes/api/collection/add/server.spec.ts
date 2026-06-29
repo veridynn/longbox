@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from './+server';
-import { importComicVineIssue, verifyInstantToken } from '$lib/server/library-import';
+import { importComicVineIssue, verifyInstantToken } from '$lib/server/collection-import';
 
-vi.mock('$lib/server/library-import', () => ({
+vi.mock('$lib/server/collection-import', () => ({
 	importComicVineIssue: vi.fn(),
 	verifyInstantToken: vi.fn()
 }));
 
-describe('POST /api/library/add', () => {
+const COLLECTION_ITEM_KEY = 'collection-item-key';
+
+describe('POST /api/collection/add', () => {
 	beforeEach(() => {
 		vi.mocked(importComicVineIssue).mockReset();
 		vi.mocked(verifyInstantToken).mockReset();
@@ -15,7 +17,7 @@ describe('POST /api/library/add', () => {
 
 	it('requires authentication', async () => {
 		const response = await POST({
-			request: new Request('http://localhost/api/library/add', {
+			request: new Request('http://localhost/api/collection/add', {
 				method: 'POST',
 				body: JSON.stringify({ issueId: 123 })
 			})
@@ -27,7 +29,7 @@ describe('POST /api/library/add', () => {
 
 	it('requires a valid ComicVine issue id', async () => {
 		const response = await POST({
-			request: new Request('http://localhost/api/library/add', {
+			request: new Request('http://localhost/api/collection/add', {
 				method: 'POST',
 				headers: { authorization: 'Bearer token' },
 				body: JSON.stringify({ issueId: 'bad' })
@@ -48,14 +50,14 @@ describe('POST /api/library/add', () => {
 			type: 'guest'
 		});
 		vi.mocked(importComicVineIssue).mockResolvedValue({
-			alreadyInLibrary: false,
+			alreadyInCollection: false,
 			issueId: '123',
 			userIssueKey: 'user-1:comicvine:123',
-			listItemKey: 'user-1:library:comicvine:123'
+			listItemKey: COLLECTION_ITEM_KEY
 		});
 
 		const response = await POST({
-			request: new Request('http://localhost/api/library/add', {
+			request: new Request('http://localhost/api/collection/add', {
 				method: 'POST',
 				headers: {
 					authorization: 'Bearer token',
@@ -70,10 +72,10 @@ describe('POST /api/library/add', () => {
 		expect(importComicVineIssue).toHaveBeenCalledWith('user-1', 123, null);
 		await expect(response.json()).resolves.toEqual({
 			imported: {
-				alreadyInLibrary: false,
+				alreadyInCollection: false,
 				issueId: '123',
 				userIssueKey: 'user-1:comicvine:123',
-				listItemKey: 'user-1:library:comicvine:123'
+				listItemKey: COLLECTION_ITEM_KEY
 			}
 		});
 	});
@@ -86,14 +88,14 @@ describe('POST /api/library/add', () => {
 			type: 'guest'
 		});
 		vi.mocked(importComicVineIssue).mockResolvedValue({
-			alreadyInLibrary: false,
+			alreadyInCollection: false,
 			issueId: '123',
 			userIssueKey: 'user-1:comicvine:123',
-			listItemKey: 'user-1:library:comicvine:123'
+			listItemKey: COLLECTION_ITEM_KEY
 		});
 
 		const response = await POST({
-			request: new Request('http://localhost/api/library/add', {
+			request: new Request('http://localhost/api/collection/add', {
 				method: 'POST',
 				headers: {
 					authorization: 'Bearer token',

@@ -42,7 +42,7 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete list</Dialog.Title>
 			<Dialog.Description>
-				This removes the list and its issue memberships. The issues stay in your library.
+				This removes the list and its issue memberships. The issues stay in your collection.
 			</Dialog.Description>
 		</Dialog.Header>
 

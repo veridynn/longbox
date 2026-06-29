@@ -38,7 +38,7 @@
 
 <div class="grid min-h-96 place-items-center">
 	<div class="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
-		<h2 class="text-xl font-semibold">Open your library</h2>
+		<h2 class="text-xl font-semibold">Open your collection</h2>
 		<p class="mt-2 text-sm leading-6 text-muted-foreground">
 			Sign in with the email you saved, or continue as a guest.
 		</p>

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ComicVineError } from '$lib/server/comicvine';
-import { importComicVineIssue, verifyInstantToken } from '$lib/server/library-import';
+import { importComicVineIssue, verifyInstantToken } from '$lib/server/collection-import';
 
 function bearerToken(header: string | null) {
 	const match = header?.match(/^Bearer\s+(.+)$/i);

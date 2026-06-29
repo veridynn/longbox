@@ -38,7 +38,7 @@ describe('InlineListTitle', () => {
 		pressInputKey('Enter');
 		await expect.element(page.getByText('Enter a list name.')).toBeInTheDocument();
 
-		await page.getByRole('textbox').fill('Library');
+		await page.getByRole('textbox').fill('Collection');
 		pressInputKey('Enter');
 		await expect
 			.element(page.getByText('A list with this name already exists.'))

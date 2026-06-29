@@ -24,7 +24,7 @@
 	let isEditing = $state(false);
 	let inputElement = $state<HTMLInputElement | null>(null);
 
-	async function startEditing() {
+	export async function startEditing() {
 		if (isSubmitting) return;
 
 		draftName = name;

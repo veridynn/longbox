@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getComicVineIssue, getComicVineVolume } from '$lib/server/comicvine';
 import { getAdminDb } from '$lib/server/instant-admin';
-import { importComicVineIssue } from './library-import';
+import { collectionItemKey } from '$lib/server/import-keys';
+import { importComicVineIssue } from './collection-import';
 
 vi.mock('$lib/server/comicvine', () => ({
 	getComicVineIssue: vi.fn(),
@@ -97,7 +98,7 @@ describe('importComicVineIssue', () => {
 		vi.mocked(getComicVineVolume).mockReset();
 	});
 
-	it('short-circuits duplicate library adds before fetching ComicVine', async () => {
+	it('short-circuits duplicate collection adds before fetching ComicVine', async () => {
 		const { db } = createAdminDb((queryShape) => {
 			if ('userListItems' in queryShape) {
 				return { userListItems: [{ position: 7 }] };
@@ -109,10 +110,10 @@ describe('importComicVineIssue', () => {
 		vi.mocked(getAdminDb).mockReturnValue(db as never);
 
 		await expect(importComicVineIssue('user-1', 123)).resolves.toEqual({
-			alreadyInLibrary: true,
+			alreadyInCollection: true,
 			issueId: '123',
 			userIssueKey: 'user-1:comicvine:123',
-			listItemKey: 'user-1:library:comicvine:123'
+			listItemKey: collectionItemKey('user-1', 123)
 		});
 
 		expect(getComicVineIssue).not.toHaveBeenCalled();
@@ -120,7 +121,7 @@ describe('importComicVineIssue', () => {
 		expect(db.transact).not.toHaveBeenCalled();
 	});
 
-	it('does not reset existing user issue fields when adding it to the library list', async () => {
+	it('does not reset existing user issue fields when adding it to the collection list', async () => {
 		const { db, updates } = createAdminDb((queryShape) => {
 			if ('userListItems' in queryShape) {
 				return { userListItems: [] };
@@ -128,6 +129,10 @@ describe('importComicVineIssue', () => {
 
 			if ('userIssues' in queryShape) {
 				return { userIssues: [{ id: 'existing-user-issue' }] };
+			}
+
+			if ('userLists' in queryShape) {
+				return { userLists: [{ name: 'Collection', items: [] }] };
 			}
 
 			return {};
@@ -138,7 +143,7 @@ describe('importComicVineIssue', () => {
 		vi.mocked(getComicVineVolume).mockResolvedValue(comicVineVolume);
 
 		await expect(importComicVineIssue('user-1', 123)).resolves.toMatchObject({
-			alreadyInLibrary: false,
+			alreadyInCollection: false,
 			issueId: '123'
 		});
 

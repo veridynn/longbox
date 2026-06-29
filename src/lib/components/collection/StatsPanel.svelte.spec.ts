@@ -4,7 +4,7 @@ import { render } from 'vitest-browser-svelte';
 import StatsPanel from './StatsPanel.svelte';
 
 describe('StatsPanel', () => {
-	it('renders first-glance library stats', async () => {
+	it('renders first-glance collection stats', async () => {
 		render(StatsPanel, {
 			favoriteCount: 2,
 			issueCount: 12,
@@ -14,7 +14,7 @@ describe('StatsPanel', () => {
 		});
 
 		await expect.element(page.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
-		await expect.element(page.getByText('Library')).toBeInTheDocument();
+		await expect.element(page.getByText('Collection')).toBeInTheDocument();
 		await expect.element(page.getByText('Favorites')).toBeInTheDocument();
 		await expect.element(page.getByText('Watchlist')).toBeInTheDocument();
 		await expect.element(page.getByText('Read')).toBeInTheDocument();

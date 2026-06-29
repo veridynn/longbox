@@ -81,7 +81,7 @@ const _schema = i.schema({
 		}),
 		issueGenres: i.entity({}),
 
-		// User library
+		// User collection
 		userIssues: i.entity({
 			acquiredAt: i.date().optional(),
 			createdAt: i.date(),
@@ -253,7 +253,7 @@ const _schema = i.schema({
 			}
 		},
 
-		// User library links
+		// User collection links
 		$usersUserIssues: {
 			forward: {
 				on: '$users',

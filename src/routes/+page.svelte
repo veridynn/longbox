@@ -2,30 +2,30 @@
 	import { id } from '@instantdb/svelte';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
-	import AppHeader from '$lib/components/library/AppHeader.svelte';
-	import AuthGate from '$lib/components/library/AuthGate.svelte';
-	import ComicSearchPanel from '$lib/components/library/ComicSearchPanel.svelte';
-	import CreateListDialog from '$lib/components/library/CreateListDialog.svelte';
-	import LibraryPanel from '$lib/components/library/LibraryPanel.svelte';
-	import ListsPanel from '$lib/components/library/ListsPanel.svelte';
-	import StatsPanel from '$lib/components/library/StatsPanel.svelte';
+	import AppHeader from '$lib/components/collection/AppHeader.svelte';
+	import AuthGate from '$lib/components/collection/AuthGate.svelte';
+	import ComicSearchPanel from '$lib/components/collection/ComicSearchPanel.svelte';
+	import CreateListDialog from '$lib/components/collection/CreateListDialog.svelte';
+	import CollectionPanel from '$lib/components/collection/CollectionPanel.svelte';
+	import ListsPanel from '$lib/components/collection/ListsPanel.svelte';
+	import StatsPanel from '$lib/components/collection/StatsPanel.svelte';
 	import {
 		validateListName,
 		type CustomListSummary
-	} from '$lib/components/library/lists';
-	import SaveAccountDialog from '$lib/components/library/SaveAccountDialog.svelte';
-	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
+	} from '$lib/components/collection/lists';
+	import SaveAccountDialog from '$lib/components/collection/SaveAccountDialog.svelte';
+	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
+	import { COLLECTION_NAME } from '$lib/collection';
 	import { db } from '$lib/db';
 
 	const auth = db.useAuth();
-	const library = db.useQuery(() =>
+	const collection = db.useQuery(() =>
 		auth.user
 			? {
 					userLists: {
 						$: {
 							where: {
-								'owner.id': auth.user.id,
-								name: 'Library'
+								'owner.id': auth.user.id
 							}
 						},
 						items: {
@@ -98,33 +98,35 @@
 	let createListName = $state('');
 	let createListError = $state<string | null>(null);
 	let isCreatingList = $state(false);
+	let collectionActionError = $state<string | null>(null);
 
-	let libraryItems = $derived(
-		((library.data?.userLists?.[0]?.items ?? []) as LibraryItem[]).filter(
-			(item) => item.userIssue?.issue
-		)
+	let collectionList = $derived(
+		collection.data?.userLists?.find((list) => list.name === COLLECTION_NAME) ?? null
 	);
-	let libraryComicVineIds = $derived(
+	let collectionItems = $derived(
+		((collectionList?.items ?? []) as CollectionItem[]).filter((item) => item.userIssue?.issue)
+	);
+	let collectionComicVineIds = $derived(
 		new Set(
-			libraryItems
+			collectionItems
 				.map((item) => item.userIssue?.issue?.comicVineId)
 				.filter((id): id is number => typeof id === 'number')
 		)
 	);
 	let favoriteCount = $derived(
-		libraryItems.filter((item) => item.userIssue?.favorite === true).length
+		collectionItems.filter((item) => item.userIssue?.favorite === true).length
 	);
 	let watchlistCount = $derived(
-		libraryItems.filter((item) => item.userIssue?.readStatus === 'unread').length
+		collectionItems.filter((item) => item.userIssue?.readStatus === 'unread').length
 	);
 	let readCount = $derived(
-		libraryItems.filter((item) => item.userIssue?.readStatus === 'read').length
+		collectionItems.filter((item) => item.userIssue?.readStatus === 'read').length
 	);
 	let customLists = $derived.by(() => {
 		const userLists = lists.data?.userLists ?? [];
 
 		return userLists
-			.filter((list) => list.name !== 'Library')
+			.filter((list) => list.name !== COLLECTION_NAME)
 			.sort((first, second) => first.createdAt.getTime() - second.createdAt.getTime())
 			.map(
 				(list): CustomListSummary => ({
@@ -141,8 +143,8 @@
 			);
 	});
 
-	function isInLibrary(issue: SearchIssue) {
-		return libraryComicVineIds.has(issue.id);
+	function isInCollection(issue: SearchIssue) {
+		return collectionComicVineIds.has(issue.id);
 	}
 
 	function openSearch() {
@@ -226,6 +228,29 @@
 
 	async function deleteList(list: CustomListSummary) {
 		await db.transact(db.tx.userLists[list.id].delete());
+	}
+
+	async function reorderCollectionItems(orderedItems: CollectionItem[]) {
+		if (!collectionList) return;
+
+		const positions = orderedItems
+			.map((item, position) => ({ id: item.id, position }))
+			.filter(
+				(item) => collectionItems.find((collectionItem) => collectionItem.id === item.id)?.position !== item.position
+			);
+		if (!positions.length) return;
+
+		collectionActionError = null;
+
+		try {
+			await db.transact([
+				...positions.map((item) => db.tx.userListItems[item.id].update({ position: item.position })),
+				db.tx.userLists[collectionList.id].update({ updatedAt: new Date() })
+			]);
+		} catch (error) {
+			collectionActionError =
+				error instanceof Error ? error.message : 'Unable to reorder your collection.';
+		}
 	}
 
 	function backToSaveAccountEmail() {
@@ -404,7 +429,7 @@
 	}
 
 	async function addIssue(issue: SearchIssue) {
-		if (isInLibrary(issue) || addingIssueIds.includes(issue.id)) {
+		if (isInCollection(issue) || addingIssueIds.includes(issue.id)) {
 			return;
 		}
 
@@ -417,7 +442,7 @@
 		addingIssueIds = [...addingIssueIds, issue.id];
 
 		try {
-			const response = await fetch('/api/library/add', {
+			const response = await fetch('/api/collection/add', {
 				method: 'POST',
 				headers: {
 					authorization: `Bearer ${auth.user.refresh_token}`,
@@ -457,7 +482,7 @@
 		{#if auth.isLoading}
 			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
 				<LoaderCircle class="mr-2 size-4 animate-spin" />
-				Loading library
+				Loading collection
 			</div>
 		{:else if !auth.user}
 			<AuthGate
@@ -477,7 +502,7 @@
 				{addingIssueIds}
 				bind:open={searchOpen}
 				bind:query
-				{isInLibrary}
+				{isInCollection}
 				{isSearching}
 				onAddIssue={addIssue}
 				onSearch={searchIssues}
@@ -511,7 +536,7 @@
 
 			<StatsPanel
 				{favoriteCount}
-				issueCount={libraryItems.length}
+				issueCount={collectionItems.length}
 				listCount={customLists.length}
 				{readCount}
 				{watchlistCount}
@@ -526,10 +551,11 @@
 				onRenameList={renameList}
 			/>
 
-			<LibraryPanel
-				errorMessage={library.error?.message ?? null}
-				isLoading={library.isLoading}
-				items={libraryItems}
+			<CollectionPanel
+				errorMessage={collectionActionError ?? collection.error?.message ?? null}
+				isLoading={collection.isLoading}
+				items={collectionItems}
+				onReorderItems={reorderCollectionItems}
 			/>
 		{/if}
 	</section>

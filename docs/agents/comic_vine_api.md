@@ -203,7 +203,7 @@ When expanding imports or background sync:
 - Cache by endpoint, id, field list, and relevant query parameters.
 - Reuse existing InstantDB catalog records when `dateLastSynced` is fresh
   enough for the feature.
-- Prefer user-triggered imports over automatic full-library scraping unless a
+- Prefer user-triggered imports over automatic full-collection scraping unless a
   clear cache/throttle plan exists.
 
 ## Attribution

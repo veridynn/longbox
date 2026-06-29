@@ -11,7 +11,7 @@ export type SearchIssue = {
 	siteDetailUrl: string | null;
 };
 
-export type LibraryItem = {
+export type CollectionItem = {
 	id: string;
 	position: number;
 	userIssue?: {
@@ -23,11 +23,11 @@ export type LibraryItem = {
 		readStatus?: string;
 		updatedAt?: Date | null;
 		userNote?: string | null;
-		issue?: LibraryIssue | null;
+		issue?: CollectionIssue | null;
 	} | null;
 };
 
-export type LibraryIssue = {
+export type CollectionIssue = {
 	id: string;
 	name?: string | null;
 	issueNumber: string;

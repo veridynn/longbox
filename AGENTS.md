@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Longbox is a local-first comic library PWA with collection management, custom lists, issue metadata, notes, and cross-device sync.
+Longbox is a local-first comic collection PWA for importing ComicVine issues, managing collection/list state in InstantDB, and editing issue metadata, notes, ratings, read status, and custom lists.
 
 ## Tech Stack
 

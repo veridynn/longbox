@@ -29,7 +29,7 @@
 		</div>
 		<div>
 			<h1 class="text-2xl font-semibold tracking-normal">Longbox</h1>
-			<p class="text-sm text-muted-foreground">Search ComicVine and build your Library.</p>
+			<p class="text-sm text-muted-foreground">Search ComicVine and build your Collection.</p>
 		</div>
 	</div>
 

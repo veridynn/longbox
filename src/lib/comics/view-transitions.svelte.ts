@@ -1,4 +1,4 @@
-import type { LibraryIssue } from './types';
+import type { CollectionIssue } from './types';
 
 export type IssueTransitionPart = 'cover';
 export type IssueTransitionDirection = 'issue-forward' | 'issue-back';
@@ -24,7 +24,7 @@ type TransitionNavigation = {
 	to: TransitionTarget;
 };
 type TransitionIssue = Pick<
-	LibraryIssue,
+	CollectionIssue,
 	'coverImageUrl' | 'id' | 'issueNumber' | 'name' | 'volume'
 >;
 type PrimeIssueTransitionOptions = {

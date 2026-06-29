@@ -1,19 +1,22 @@
 <script lang="ts">
 	import { id } from '@instantdb/svelte';
-	import { ArrowLeft, LoaderCircle, Plus, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, EllipsisVertical, LoaderCircle, Pencil, Plus, Search, Trash2 } from '@lucide/svelte';
+	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
-	import ComicSearchPanel from '$lib/components/library/ComicSearchPanel.svelte';
-	import DeleteListDialog from '$lib/components/library/DeleteListDialog.svelte';
-	import InlineListTitle from '$lib/components/library/InlineListTitle.svelte';
-	import ListIssueRows from '$lib/components/library/ListIssueRows.svelte';
+	import ComicSearchPanel from '$lib/components/collection/ComicSearchPanel.svelte';
+	import DeleteListDialog from '$lib/components/collection/DeleteListDialog.svelte';
+	import InlineListTitle from '$lib/components/collection/InlineListTitle.svelte';
+	import IssueListPanel, { type IssueListViewMode } from '$lib/components/collection/IssueListPanel.svelte';
+	import * as Popover from '$lib/components/ui/popover';
 	import {
 		customListItemKey,
 		isDuplicateListItemError,
-		listHasLibraryItem,
+		listHasCollectionItem,
 		listHasSearchIssue,
 		stableUserIssueKey
-	} from '$lib/components/library/lists';
-	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
+	} from '$lib/components/collection/lists';
+	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
+	import { COLLECTION_NAME } from '$lib/collection';
 	import { db } from '$lib/db';
 	import { goto } from '$app/navigation';
 
@@ -21,7 +24,7 @@
 		id: string;
 		listKey: string;
 		name: string;
-		items: LibraryItem[];
+		items: CollectionItem[];
 	};
 
 	let { params }: PageProps = $props();
@@ -61,14 +64,13 @@
 				}
 			: null
 	);
-	const libraryQuery = db.useQuery(() =>
+	const collectionQuery = db.useQuery(() =>
 		auth.user
 			? {
 					userLists: {
 						$: {
 							where: {
-								'owner.id': auth.user.id,
-								name: 'Library'
+								'owner.id': auth.user.id
 							}
 						},
 						items: {
@@ -113,38 +115,91 @@
 	let addingUserIssueIds = $state<string[]>([]);
 	let deleteListError = $state<string | null>(null);
 	let deleteListOpen = $state(false);
+	let listMenuOpen = $state(false);
 	let isDeletingList = $state(false);
 	let listActionError = $state<string | null>(null);
+	let listSearchQuery = $state('');
+	let listViewMode = $state<IssueListViewMode>('gallery');
+	let pageTitle = $state<InlineListTitle | null>(null);
 	let removingItemIds = $state<string[]>([]);
+	let shortcutModifier = $state('⌘');
 
 	const currentList = $derived((listQuery.data?.userLists?.[0] as UserList | undefined) ?? null);
 	const listItems = $derived(
-		((currentList?.items ?? []) as LibraryItem[]).filter((item) => item.userIssue?.issue)
+		((currentList?.items ?? []) as CollectionItem[]).filter((item) => item.userIssue?.issue)
 	);
-	const libraryItems = $derived(
-		((libraryQuery.data?.userLists?.[0]?.items ?? []) as LibraryItem[]).filter(
+	const filteredListItems = $derived(
+		listSearchQuery.trim()
+			? listItems.filter((item) => listItemSearchText(item).includes(listSearchQuery.trim().toLowerCase()))
+			: listItems
+	);
+	const collectionItems = $derived(
+		(
+			(collectionQuery.data?.userLists?.find((list) => list.name === COLLECTION_NAME)
+				?.items ?? []) as CollectionItem[]
+		).filter(
 			(item) => item.userIssue?.issue
 		)
 	);
-	const libraryItemByComicVineId = $derived(
+	const collectionItemByComicVineId = $derived(
 		new Map(
-			libraryItems
+			collectionItems
 				.map((item) => [item.userIssue?.issue?.comicVineId, item] as const)
-				.filter((entry): entry is readonly [number, LibraryItem] => typeof entry[0] === 'number')
+				.filter((entry): entry is readonly [number, CollectionItem] => typeof entry[0] === 'number')
 		)
 	);
 	const existingListNames = $derived((allListsQuery.data?.userLists ?? []).map((list) => list.name));
 
+	onMount(() => {
+		if (!/(Mac|iPhone|iPad|iPod)/.test(navigator.platform)) {
+			shortcutModifier = 'Ctrl';
+		}
+	});
+
 	function openSearch() {
 		searchOpen = true;
+	}
+
+	function renameCurrentList() {
+		listMenuOpen = false;
+		void pageTitle?.startEditing();
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (!auth.user || !currentList || event.defaultPrevented || (!event.metaKey && !event.ctrlKey)) {
+			return;
+		}
+
+		if (event.key.toLowerCase() === 'k') {
+			event.preventDefault();
+			openSearch();
+		}
 	}
 
 	function isSearchIssueInList(issue: SearchIssue) {
 		return listHasSearchIssue(listItems, issue, addingIssueIds);
 	}
 
-	function isLibraryItemInList(item: LibraryItem) {
-		return listHasLibraryItem(listItems, item, addingUserIssueIds);
+	function isCollectionItemInList(item: CollectionItem) {
+		return listHasCollectionItem(listItems, item, addingUserIssueIds);
+	}
+
+	function listItemSearchText(item: CollectionItem) {
+		const issue = item.userIssue?.issue;
+		return [
+			issue?.volume?.name,
+			issue?.issueNumber,
+			issue?.name,
+			issue?.volume?.publisher?.name,
+			issue?.summary
+		]
+			.filter(Boolean)
+			.join(' ')
+			.toLowerCase();
+	}
+
+	function closeListSearch() {
+		listSearchQuery = '';
 	}
 
 	async function readJsonResponse(response: Response) {
@@ -185,12 +240,12 @@
 		}
 	}
 
-	async function addLibraryItem(item: LibraryItem) {
+	async function addCollectionItem(item: CollectionItem) {
 		const list = currentList;
 		const userIssueId = item.userIssue?.id;
 		const comicVineId = item.userIssue?.issue?.comicVineId;
 
-		if (!list || !userIssueId || isLibraryItemInList(item)) {
+		if (!list || !userIssueId || isCollectionItemInList(item)) {
 			return;
 		}
 
@@ -230,10 +285,10 @@
 	}
 
 	async function addIssue(issue: SearchIssue) {
-		const libraryItem = libraryItemByComicVineId.get(issue.id);
+		const collectionItem = collectionItemByComicVineId.get(issue.id);
 
-		if (libraryItem) {
-			await addLibraryItem(libraryItem);
+		if (collectionItem) {
+			await addCollectionItem(collectionItem);
 			return;
 		}
 
@@ -250,7 +305,7 @@
 		addingIssueIds = [...addingIssueIds, issue.id];
 
 		try {
-			const response = await fetch('/api/library/add', {
+			const response = await fetch('/api/collection/add', {
 				method: 'POST',
 				headers: {
 					authorization: `Bearer ${auth.user.refresh_token}`,
@@ -321,9 +376,9 @@
 		}
 	}
 
-	async function reorderListItems(orderedItems: LibraryItem[]) {
+	async function reorderListItems(orderedItems: CollectionItem[]) {
 		const list = currentList;
-		if (!list) return;
+		if (!list || listSearchQuery.trim()) return;
 
 		const positions = orderedItems
 			.map((item, position) => ({ id: item.id, position }))
@@ -341,11 +396,14 @@
 			listActionError = error instanceof Error ? error.message : 'Unable to reorder this list.';
 		}
 	}
+
 </script>
 
 <svelte:head>
 	<title>{currentList?.name ?? 'List'} · Longbox</title>
 </svelte:head>
+
+<svelte:document onkeydown={handleKeydown} />
 
 <main class="min-h-screen bg-background text-foreground">
 	<section class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
@@ -356,11 +414,12 @@
 					href="/"
 				>
 					<ArrowLeft class="size-4" />
-					Library
+					Collection
 				</a>
 				<h1 class="mt-3">
 					{#if currentList}
 						<InlineListTitle
+							bind:this={pageTitle}
 							class="text-2xl font-semibold tracking-normal"
 							existingNames={existingListNames}
 							isSubmitting={isDeletingList}
@@ -386,18 +445,46 @@
 					>
 						<Plus class="size-4" />
 						Add issues
+						<span class="ml-1 hidden items-center gap-1 text-xs text-primary-foreground/70 sm:flex">
+							<kbd class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1.5 font-mono text-[10px] font-medium">
+								{shortcutModifier}
+							</kbd>
+							<kbd class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1.5 font-mono text-[10px] font-medium">
+								K
+							</kbd>
+						</span>
 					</button>
-					<button
-						type="button"
-						class="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-destructive hover:bg-destructive/10"
-						onclick={() => {
-							deleteListError = null;
-							deleteListOpen = true;
-						}}
-					>
-						<Trash2 class="size-4" />
-						Delete list
-					</button>
+					<Popover.Root bind:open={listMenuOpen}>
+						<Popover.Trigger
+							type="button"
+							class="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+							aria-label="Open list actions"
+						>
+							<EllipsisVertical class="size-4" />
+						</Popover.Trigger>
+						<Popover.Content class="w-max p-1.5" align="end">
+							<button
+								type="button"
+								class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium hover:bg-muted"
+								onclick={renameCurrentList}
+							>
+								<Pencil class="size-4" />
+								Rename list
+							</button>
+							<button
+								type="button"
+								class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
+								onclick={() => {
+									listMenuOpen = false;
+									deleteListError = null;
+									deleteListOpen = true;
+								}}
+							>
+								<Trash2 class="size-4" />
+								Delete list
+							</button>
+						</Popover.Content>
+					</Popover.Root>
 				</div>
 			{/if}
 		</header>
@@ -409,7 +496,7 @@
 			</div>
 		{:else if !auth.user}
 			<p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-				Sign in from the Library page to view lists.
+				Sign in from the Collection page to view lists.
 			</p>
 		{:else if listQuery.error}
 			<p class="rounded-lg border border-border bg-card p-6 text-sm text-destructive">
@@ -420,14 +507,14 @@
 				List not found.
 			</p>
 		{:else}
-			{#if libraryQuery.isLoading}
+			{#if collectionQuery.isLoading}
 				<div class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
 					<LoaderCircle class="mr-2 inline size-4 animate-spin" />
-					Loading library issues
+					Loading collection issues
 				</div>
-			{:else if libraryQuery.error}
+			{:else if collectionQuery.error}
 				<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-					{libraryQuery.error.message}
+					{collectionQuery.error.message}
 				</p>
 			{:else}
 				<ComicSearchPanel
@@ -437,12 +524,12 @@
 					addedLabel="Added"
 					bind:open={searchOpen}
 					bind:query
-					isInLibrary={isSearchIssueInList}
-					isLibraryItemAdded={isLibraryItemInList}
+					isInCollection={isSearchIssueInList}
+					isCollectionItemAdded={isCollectionItemInList}
 					{isSearching}
-					{libraryItems}
+					{collectionItems}
 					onAddIssue={addIssue}
-					onAddLibraryItem={addLibraryItem}
+					onAddCollectionItem={addCollectionItem}
 					onSearch={searchIssues}
 					resultLimit={12}
 					{results}
@@ -456,29 +543,54 @@
 					{listActionError}
 				</p>
 			{/if}
-			<section class="overflow-hidden rounded-lg border border-border bg-card">
-				<div class="flex items-center justify-between border-b border-border px-4 py-3">
-					<InlineListTitle
-						class="font-semibold"
-						existingNames={existingListNames}
-						isSubmitting={isDeletingList}
-						name={currentList.name}
-						onRename={renameList}
-					/>
-					<span class="text-sm text-muted-foreground">{listItems.length} issues</span>
-				</div>
+			<IssueListPanel
+				items={filteredListItems}
+				viewMode={listViewMode}
+				onRemoveListItem={removeListItem}
+				onReorderItems={reorderListItems}
+				onViewModeChange={(viewMode) => {
+					listViewMode = viewMode;
+				}}
+				{removingItemIds}
+			>
+				{#snippet controls()}
+					<div class="relative size-9">
+						<div
+							class={`group absolute -right-1 -top-1 z-10 flex h-11 items-center p-1 transition-[width] duration-200 ease-out hover:w-[16.5rem] focus-within:w-[16.5rem] ${
+								listSearchQuery.trim() ? 'w-[16.5rem]' : 'w-11'
+							}`}
+						>
+							<div class="relative flex h-9 w-full items-center overflow-hidden rounded-md">
+								<div
+									class={`pointer-events-none absolute inset-0 rounded-md bg-muted transition-opacity duration-200 ease-out group-hover:opacity-100 group-focus-within:opacity-100 ${
+										listSearchQuery.trim() ? 'opacity-100' : 'opacity-0'
+									}`}
+								></div>
+								<div class="pointer-events-none relative inline-flex size-9 shrink-0 items-center justify-center text-muted-foreground">
+									<Search class="size-4" />
+								</div>
+								<input
+									class={`relative h-9 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none transition-opacity duration-150 placeholder:text-muted-foreground focus:border-transparent focus:ring-0 group-hover:opacity-100 group-focus-within:opacity-100 ${
+										listSearchQuery.trim() ? 'opacity-100' : 'opacity-0'
+									}`}
+									aria-label="Search list"
+									placeholder="Search list"
+									bind:value={listSearchQuery}
+									onkeydown={(event) => {
+										if (event.key === 'Escape') {
+											closeListSearch();
+										}
+									}}
+								/>
+							</div>
+						</div>
+					</div>
+				{/snippet}
 
-				{#if listItems.length}
-					<ListIssueRows
-						items={listItems}
-						onRemoveListItem={removeListItem}
-						onReorderListItems={reorderListItems}
-						{removingItemIds}
-					/>
-				{:else}
+				{#snippet empty()}
 					<div class="grid gap-3 px-4 py-12 text-center">
 						<p class="text-sm text-muted-foreground">
-							Add issues from your Library, or search ComicVine for something new.
+							Add issues from your Collection, or search ComicVine for something new.
 						</p>
 						<button
 							type="button"
@@ -489,8 +601,8 @@
 							Add issues
 						</button>
 					</div>
-				{/if}
-			</section>
+				{/snippet}
+			</IssueListPanel>
 		{/if}
 	</section>
 </main>

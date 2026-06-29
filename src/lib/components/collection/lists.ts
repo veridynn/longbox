@@ -1,4 +1,5 @@
-import type { LibraryItem, SearchIssue } from '$lib/comics/types';
+import type { CollectionItem, SearchIssue } from '$lib/comics/types';
+import { COLLECTION_NAME } from '$lib/collection';
 
 export type CustomListSummary = {
 	coverImageUrls: string[];
@@ -9,7 +10,7 @@ export type CustomListSummary = {
 	updatedAt: Date;
 };
 
-const RESERVED_LIST_NAMES = ['library', 'favorites', 'watchlist'];
+const RESERVED_LIST_NAMES = [COLLECTION_NAME.toLowerCase(), 'favorites', 'watchlist'];
 
 function normalizedListName(name: string) {
 	return name.trim().toLowerCase();
@@ -48,14 +49,14 @@ export function customListItemKey(listKey: string, stableIssueKey: string) {
 	return `${listKey}:userIssue:${stableIssueKey}`;
 }
 
-function comicVineIdForItem(item: LibraryItem) {
+function comicVineIdForItem(item: CollectionItem) {
 	const comicVineId = item.userIssue?.issue?.comicVineId;
 	return typeof comicVineId === 'number' ? comicVineId : null;
 }
 
-export function listHasLibraryItem(
-	listItems: LibraryItem[],
-	item: LibraryItem,
+export function listHasCollectionItem(
+	listItems: CollectionItem[],
+	item: CollectionItem,
 	pendingUserIssueIds: string[]
 ) {
 	const userIssueId = item.userIssue?.id;
@@ -75,7 +76,7 @@ export function listHasLibraryItem(
 }
 
 export function listHasSearchIssue(
-	listItems: LibraryItem[],
+	listItems: CollectionItem[],
 	issue: SearchIssue,
 	pendingIssueIds: number[]
 ) {
@@ -85,7 +86,7 @@ export function listHasSearchIssue(
 	);
 }
 
-export function reorderedListPositions(items: LibraryItem[], fromId: string, toId: string) {
+export function reorderedListItems(items: CollectionItem[], fromId: string, toId: string) {
 	if (fromId === toId) {
 		return [];
 	}
@@ -101,7 +102,14 @@ export function reorderedListPositions(items: LibraryItem[], fromId: string, toI
 	const [movedItem] = reorderedItems.splice(fromIndex, 1);
 	reorderedItems.splice(toIndex, 0, movedItem);
 
-	return reorderedItems.map((item, position) => ({ id: item.id, position }));
+	return reorderedItems;
+}
+
+export function reorderedListPositions(items: CollectionItem[], fromId: string, toId: string) {
+	return reorderedListItems(items, fromId, toId).map((item, position) => ({
+		id: item.id,
+		position
+	}));
 }
 
 export function isDuplicateListItemError(error: unknown) {

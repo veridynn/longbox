@@ -22,7 +22,7 @@
 	import { Toggle } from '$lib/components/ui/toggle';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group';
 	import { formatDate } from '$lib/comics/format';
-	import type { LibraryIssue } from '$lib/comics/types';
+	import type { CollectionIssue } from '$lib/comics/types';
 	import {
 		getIssueTransitionPreview,
 		isActiveIssueTransition,
@@ -40,7 +40,7 @@
 		readStatus: string;
 		updatedAt: Date;
 		userNote?: string | null;
-		issue?: LibraryIssue | null;
+		issue?: CollectionIssue | null;
 	};
 
 	type SaveStatus = 'saved' | 'saving' | 'dirty' | 'error';
@@ -103,7 +103,7 @@
 	const userIssue = $derived(
 		(userIssueQuery.data?.userIssues?.[0] as DetailUserIssue | undefined) ?? null
 	);
-	const issue = $derived((issueQuery.data?.issues?.[0] as LibraryIssue | undefined) ?? null);
+	const issue = $derived((issueQuery.data?.issues?.[0] as CollectionIssue | undefined) ?? null);
 	const transitionPreview = $derived(getIssueTransitionPreview(params.issueId));
 	const title = $derived(issue ? issueTitle(issue) : (transitionPreview?.title ?? 'Issue details'));
 	const coverImageUrl = $derived(issue?.coverImageUrl ?? transitionPreview?.coverImageUrl ?? null);
@@ -327,7 +327,7 @@
 		}
 	}
 
-	function issueTitle(issueValue: LibraryIssue) {
+	function issueTitle(issueValue: CollectionIssue) {
 		const volumeName = issueValue.volume?.name ?? 'Unknown volume';
 		const issueName = issueValue.name ? `: ${issueValue.name}` : '';
 		return `${volumeName} #${issueValue.issueNumber}${issueName}`;
@@ -338,7 +338,7 @@
 		return record?.name;
 	}
 
-	function characterNames(issueValue: LibraryIssue | null) {
+	function characterNames(issueValue: CollectionIssue | null) {
 		return Array.from(
 			new Set(
 				(issueValue?.issueCharacters ?? [])
@@ -348,7 +348,7 @@
 		);
 	}
 
-	function groupCredits(issueValue: LibraryIssue | null) {
+	function groupCredits(issueValue: CollectionIssue | null) {
 		const byRole: Record<string, string[]> = {};
 
 		for (const credit of issueValue?.credits ?? []) {
@@ -364,7 +364,7 @@
 		}));
 	}
 
-	function detailRows(issueValue: LibraryIssue | null) {
+	function detailRows(issueValue: CollectionIssue | null) {
 		if (!issueValue) {
 			return [];
 		}
@@ -401,7 +401,7 @@
 				onclick={prepareIssueTransition}
 			>
 				<ArrowLeft data-icon="inline-start" />
-				Library
+				Collection
 			</Button>
 		</div>
 
@@ -446,13 +446,13 @@
 						<section class="rounded-lg border border-border bg-card p-4">
 							<div class="flex items-center text-sm text-muted-foreground">
 								<LoaderCircle class="mr-2 size-4 animate-spin" />
-								Loading library fields
+								Loading collection fields
 							</div>
 						</section>
 					{:else if auth.user}
 						<section class="rounded-lg border border-border bg-card p-4">
 							<div class="flex flex-wrap items-center justify-between gap-3">
-								<h2 class="font-semibold">My library</h2>
+								<h2 class="font-semibold">My collection</h2>
 								<div class="flex items-center gap-2 text-sm text-muted-foreground">
 									{#if saveStatus === 'saving'}
 										<LoaderCircle class="size-4 animate-spin" />
@@ -631,7 +631,7 @@
 								{/if}
 							{:else}
 								<p class="mt-3 text-sm leading-6 text-muted-foreground">
-									This issue is not saved in your library.
+									This issue is not saved in your collection.
 								</p>
 							{/if}
 						</section>

@@ -46,6 +46,7 @@ describe('ListsPanel', () => {
 		expect(document.body.textContent).toContain('1 issue');
 		expect(document.querySelectorAll('a[href="/list/one"] img')).toHaveLength(5);
 		expect(document.querySelectorAll('a[href="/list/two"] [aria-hidden="true"]')).toHaveLength(5);
+		expect(page.getByLabelText('View mode')).not.toBeInTheDocument();
 	});
 
 	it('opens list creation from the header button and keyboard shortcut', async () => {

@@ -26,14 +26,14 @@ describe('issue view transition helpers', () => {
 		expect(issueIdFromPath('/')).toBeNull();
 	});
 
-	it('detects library to issue detail transitions', () => {
+	it('detects collection to issue detail transitions', () => {
 		const nav = navigation('/', '/issues/issue-123');
 
 		expect(issueTransitionDirection(nav)).toBe('issue-forward');
 		expect(issueTransitionIssueId(nav)).toBe('issue-123');
 	});
 
-	it('detects issue detail to library transitions', () => {
+	it('detects issue detail to collection transitions', () => {
 		const nav = navigation('/issues/issue-123', '/');
 
 		expect(issueTransitionDirection(nav)).toBe('issue-back');

@@ -3,19 +3,19 @@
 	import { Check, LoaderCircle, Plus, Search } from '@lucide/svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { formatDate, issueTitle } from '$lib/comics/format';
-	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
+	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
 
 	type Props = {
 		addError: string | null;
 		addingIssueIds: number[];
 		addingUserIssueIds?: string[];
 		addedLabel?: string;
-		isInLibrary: (issue: SearchIssue) => boolean;
-		isLibraryItemAdded?: (item: LibraryItem) => boolean;
+		isInCollection: (issue: SearchIssue) => boolean;
+		isCollectionItemAdded?: (item: CollectionItem) => boolean;
 		isSearching: boolean;
-		libraryItems?: LibraryItem[];
+		collectionItems?: CollectionItem[];
 		onAddIssue: (issue: SearchIssue) => void;
-		onAddLibraryItem?: (item: LibraryItem) => void;
+		onAddCollectionItem?: (item: CollectionItem) => void;
 		onSearch: () => void;
 		open: boolean;
 		query: string;
@@ -30,19 +30,19 @@
 		addingIssueIds,
 		addingUserIssueIds = [],
 		addedLabel = 'Owned',
-		isInLibrary,
-		isLibraryItemAdded = () => false,
+		isInCollection,
+		isCollectionItemAdded = () => false,
 		isSearching,
-		libraryItems = [],
+		collectionItems = [],
 		onAddIssue,
-		onAddLibraryItem,
+		onAddCollectionItem,
 		onSearch,
 		open = $bindable(),
 		query = $bindable(),
 		resultLimit,
 		results,
 		searchError,
-		targetName = 'Library'
+		targetName = 'Collection'
 	}: Props = $props();
 
 	let searchInput = $state<HTMLInputElement | null>(null);
@@ -65,7 +65,7 @@
 		}
 	}
 
-	function libraryItemTitle(item: LibraryItem) {
+	function collectionItemTitle(item: CollectionItem) {
 		const issue = item.userIssue?.issue;
 		if (!issue) return 'Unknown issue';
 
@@ -77,7 +77,7 @@
 <Command.Dialog
 	bind:open
 	class="top-20 max-h-[calc(100dvh-6rem)] w-[calc(100vw-2rem)] max-w-2xl translate-y-0"
-	description="Search ComicVine issues and add them to your library."
+	description="Search ComicVine issues and add them to your collection."
 	title="Search ComicVine"
 >
 	<form class="border-b border-border p-2" onsubmit={handleSearchSubmit}>
@@ -134,13 +134,13 @@
 	</div>
 
 	<Command.List class="max-h-[min(28rem,calc(100dvh-16rem))]">
-		{#if libraryItems.length || results.length}
-			{#if libraryItems.length}
+		{#if collectionItems.length || results.length}
+			{#if collectionItems.length}
 				<div class="px-3 pt-1 pb-2">
-					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Library</h3>
+					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Collection</h3>
 				</div>
 				<ul class="divide-y divide-border border-b border-border">
-					{#each libraryItems as item (item.id)}
+					{#each collectionItems as item (item.id)}
 						{@const issue = item.userIssue?.issue}
 						{@const userIssueId = item.userIssue?.id}
 						{#if issue && userIssueId}
@@ -151,7 +151,7 @@
 									alt=""
 								/>
 								<div class="min-w-0 flex-1">
-									<h4 class="line-clamp-2 text-sm font-semibold">{libraryItemTitle(item)}</h4>
+									<h4 class="line-clamp-2 text-sm font-semibold">{collectionItemTitle(item)}</h4>
 									<p class="mt-1 text-xs text-muted-foreground">
 										{formatDate(issue.coverDate)}
 									</p>
@@ -159,15 +159,15 @@
 								<button
 									type="button"
 									class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-									aria-label={isLibraryItemAdded(item)
-										? `${libraryItemTitle(item)} is already in ${targetName}`
-										: `Add ${libraryItemTitle(item)} to ${targetName}`}
-									disabled={addingUserIssueIds.includes(userIssueId) || isLibraryItemAdded(item)}
-									onclick={() => onAddLibraryItem?.(item)}
+									aria-label={isCollectionItemAdded(item)
+										? `${collectionItemTitle(item)} is already in ${targetName}`
+										: `Add ${collectionItemTitle(item)} to ${targetName}`}
+									disabled={addingUserIssueIds.includes(userIssueId) || isCollectionItemAdded(item)}
+									onclick={() => onAddCollectionItem?.(item)}
 								>
 									{#if addingUserIssueIds.includes(userIssueId)}
 										<LoaderCircle class="size-4 animate-spin" />
-									{:else if isLibraryItemAdded(item)}
+									{:else if isCollectionItemAdded(item)}
 										<Check class="size-4" />
 										{addedLabel}
 									{:else}
@@ -212,15 +212,15 @@
 						<button
 							type="button"
 							class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-							aria-label={isInLibrary(issue)
+							aria-label={isInCollection(issue)
 								? `${issueTitle(issue)} is already in ${targetName}`
 								: `Add ${issueTitle(issue)} to ${targetName}`}
-							disabled={addingIssueIds.includes(issue.id) || isInLibrary(issue)}
+							disabled={addingIssueIds.includes(issue.id) || isInCollection(issue)}
 							onclick={() => onAddIssue(issue)}
 						>
 							{#if addingIssueIds.includes(issue.id)}
 								<LoaderCircle class="size-4 animate-spin" />
-							{:else if isInLibrary(issue)}
+							{:else if isInCollection(issue)}
 								<Check class="size-4" />
 								{addedLabel}
 							{:else}
@@ -232,7 +232,7 @@
 			</ul>
 		{:else}
 			<p class="px-4 py-12 text-center text-sm text-muted-foreground">
-				Search for an exact issue to add it to your Library.
+				Search for an exact issue to add it to your Collection.
 			</p>
 		{/if}
 	</Command.List>

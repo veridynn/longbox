@@ -1,7 +1,7 @@
 {
 	"name": "Longbox",
 	"short_name": "Longbox",
-	"description": "A comic-library app for searching, importing, and managing your collection.",
+	"description": "A comic collection app for searching, importing, and managing your collection.",
 	"start_url": "/",
 	"scope": "/",
 	"display": "standalone",

@@ -5,19 +5,20 @@ import {
 	getComicVineVolume,
 	type ComicVineIssueDetail
 } from '$lib/server/comicvine';
+import { COLLECTION_NAME } from '$lib/collection';
 import {
+	collectionItemKey,
+	collectionListKey,
+	collectionName,
 	creditKey,
 	issueCharacterKey,
-	libraryName,
-	listItemKey,
-	listKey,
 	recordIdForKey,
 	userIssueKey
 } from '$lib/server/import-keys';
 
 type ImportedIssue = {
 	issueId: string;
-	alreadyInLibrary: boolean;
+	alreadyInCollection: boolean;
 	userIssueKey: string;
 	listItemKey: string;
 };
@@ -40,20 +41,21 @@ function firstName(...values: Array<string | null | undefined>) {
 	return values.find((value) => value && value.trim()) ?? 'Unknown';
 }
 
-async function nextLibraryPosition(ownerId: string) {
+async function nextCollectionPosition(ownerId: string) {
 	const adminDb = getAdminDb();
 	const data = await adminDb.query({
-		userListItems: {
+		userLists: {
 			$: {
 				where: {
-					'list.owner.id': ownerId,
-					'list.name': libraryName()
+					'owner.id': ownerId
 				}
-			}
+			},
+			items: {}
 		}
 	});
+	const collectionList = data.userLists.find((list) => list.name === COLLECTION_NAME);
 
-	return data.userListItems.length;
+	return collectionList?.items?.length ?? 0;
 }
 
 async function existingListItem(listItemKeyValue: string) {
@@ -101,7 +103,7 @@ async function ownedCustomList(ownerId: string, listId: string) {
 	});
 	const list = data.userLists[0] as TargetList | undefined;
 
-	if (!list || list.name === libraryName()) {
+	if (!list || list.name === COLLECTION_NAME) {
 		throw new Error('List not found.');
 	}
 
@@ -143,7 +145,7 @@ export async function importComicVineIssue(
 ): Promise<ImportedIssue> {
 	const adminDb = getAdminDb();
 	const inputUserIssueKey = userIssueKey(ownerId, issueComicVineId);
-	const inputListItemKey = listItemKey(ownerId, issueComicVineId);
+	const inputListItemKey = collectionItemKey(ownerId, issueComicVineId);
 	const targetList = targetListId ? await ownedCustomList(ownerId, targetListId) : null;
 	const currentListItem = await existingListItem(inputListItemKey);
 
@@ -154,7 +156,7 @@ export async function importComicVineIssue(
 
 		return {
 			issueId: String(issueComicVineId),
-			alreadyInLibrary: true,
+			alreadyInCollection: true,
 			userIssueKey: inputUserIssueKey,
 			listItemKey: inputListItemKey
 		};
@@ -166,11 +168,11 @@ export async function importComicVineIssue(
 
 	const publisher = volume?.publisher;
 	const stableUserIssueKey = userIssueKey(ownerId, issue.id);
-	const stableListItemKey = listItemKey(ownerId, issue.id);
-	const stableListKey = listKey(ownerId);
+	const stableListItemKey = collectionItemKey(ownerId, issue.id);
+	const stableListKey = collectionListKey(ownerId);
 	const stableListId = recordIdForKey(stableListKey);
 	const currentUserIssue = await existingUserIssue(stableUserIssueKey);
-	const position = await nextLibraryPosition(ownerId);
+	const position = await nextCollectionPosition(ownerId);
 	type TransactionInput = Parameters<typeof adminDb.transact>[0];
 
 	const transactions: Exclude<TransactionInput, readonly unknown[]>[] = [
@@ -178,7 +180,7 @@ export async function importComicVineIssue(
 			.update({
 				createdAt: now,
 				listKey: stableListKey,
-				name: libraryName(),
+				name: collectionName(),
 				updatedAt: now
 			})
 			.link({ owner: ownerId })
@@ -300,7 +302,7 @@ export async function importComicVineIssue(
 
 	return {
 		issueId: String(issue.id),
-		alreadyInLibrary: false,
+		alreadyInCollection: false,
 		userIssueKey: stableUserIssueKey,
 		listItemKey: stableListItemKey
 	};

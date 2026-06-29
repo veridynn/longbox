@@ -1,6 +1,6 @@
 # ![Longbox logo][longbox-logo] Longbox
 
-Longbox is a local-first comic library for organizing a personal collection, keeping issue notes, building custom lists, and rediscovering what is already on the shelf.
+Longbox is a personal comic collection manager for importing issues, tracking owned/read status, adding notes and ratings, and building custom lists.
 
 ## 🧰 Tech Stack
 
@@ -25,7 +25,24 @@ vp install && vpr dev
 
 - [ ] Disable caching for development enviorment so page refreshes always show the latest changes.
 - [x] Separate development and production databases.
-- [ ] Move agent documentation from `docs` to `.agents/docs`, including a new home for `docs/assets/longbox-logo.svg`.
+- [x] Move agent documentation from `docs` to `.agents/docs`, including a new home for `docs/assets/longbox-logo.svg`.
+- [ ] Prevent duplicate collection issues
+- [ ] Dev/prod InstantDB env split needs to be documented and verified end to end
+- [ ] PWA caching still needs a dev-mode strategy
+- [ ] Remove env file setup
+- [ ] Fix back button from list page to issue detail page (leads to main page instead of back to list page)
+- [ ] rework list component
+  - [x] remove list title and unify list component (in list page you see title twice: page title and list title)
+  - [x] add grid mode
+    - [x] gried view
+    - [ ] edit mode
+      - [ ] dnd & delete
+  - [ ] add edit mode
+    - [ ] add delete
+    - [ ] make reorder handle default to the component (missing in mainpage)
+  - [ ] add filters
+  - [x] add search
+  - [ ] add sorts (including cutome user reorder)
 
 ## 📜 Scripts
 

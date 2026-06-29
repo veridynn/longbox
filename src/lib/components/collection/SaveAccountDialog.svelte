@@ -44,7 +44,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Save your library</Dialog.Title>
+			<Dialog.Title>Save your collection</Dialog.Title>
 			<Dialog.Description>
 				Register this guest account with an email so you can sign in again later.
 			</Dialog.Description>

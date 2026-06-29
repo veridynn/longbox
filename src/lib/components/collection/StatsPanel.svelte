@@ -21,7 +21,7 @@
 		<article class="rounded-lg border border-border bg-card p-4">
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
 				<BookOpen class="size-4" />
-				Library
+				Collection
 			</div>
 			<p class="mt-3 text-2xl font-semibold">{issueCount}</p>
 		</article>

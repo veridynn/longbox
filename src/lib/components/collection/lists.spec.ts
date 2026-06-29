@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
 	customListItemKey,
 	isDuplicateListItemError,
-	listHasLibraryItem,
+	listHasCollectionItem,
 	listHasSearchIssue,
+	reorderedListItems,
 	reorderedListPositions,
 	stableUserIssueKey,
 	validateListName
@@ -14,7 +15,7 @@ describe('validateListName', () => {
 		expect(validateListName('   ', [])).toBe('Enter a list name.');
 	});
 
-	it.each(['Library', 'favorites', 'WATCHLIST'])('rejects the reserved name %s', (name) => {
+	it.each(['Collection', 'favorites', 'WATCHLIST'])('rejects the reserved name %s', (name) => {
 		expect(validateListName(name, [])).toBe('A list with this name already exists.');
 	});
 
@@ -25,7 +26,7 @@ describe('validateListName', () => {
 	});
 
 	it('allows the current list name when renaming', () => {
-		expect(validateListName('  To Read ', ['Library', 'to read'], 'To read')).toBeNull();
+		expect(validateListName('  To Read ', ['Collection', 'to read'], 'To read')).toBeNull();
 	});
 
 	it('accepts a unique name', () => {
@@ -68,9 +69,9 @@ describe('list item helpers', () => {
 		}
 	];
 
-	it('detects duplicate library items by user issue, ComicVine id, and pending state', () => {
+	it('detects duplicate collection items by user issue, ComicVine id, and pending state', () => {
 		expect(
-			listHasLibraryItem(
+			listHasCollectionItem(
 				listItems,
 				{
 					id: 'new-item',
@@ -84,7 +85,7 @@ describe('list item helpers', () => {
 			)
 		).toBe(true);
 		expect(
-			listHasLibraryItem(
+			listHasCollectionItem(
 				listItems,
 				{
 					id: 'new-item',
@@ -133,6 +134,11 @@ describe('list item helpers', () => {
 	});
 
 	it('calculates reordered positions', () => {
+		expect(reorderedListItems(listItems, 'item-1', 'item-3').map((item) => item.id)).toEqual([
+			'item-2',
+			'item-3',
+			'item-1'
+		]);
 		expect(reorderedListPositions(listItems, 'item-1', 'item-3')).toEqual([
 			{ id: 'item-2', position: 0 },
 			{ id: 'item-3', position: 1 },
