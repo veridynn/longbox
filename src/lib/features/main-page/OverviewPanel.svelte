@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { BookOpen, CheckCircle2, Eye, Heart, List } from '@lucide/svelte';
+	import Section from './Section.svelte';
 
 	type Props = {
 		favoriteCount: number;
@@ -12,11 +13,7 @@
 	let { favoriteCount, issueCount, listCount, readCount, watchlistCount }: Props = $props();
 </script>
 
-<section aria-labelledby="overview-heading" class="grid gap-3">
-	<div class="flex items-center justify-between">
-		<h2 id="overview-heading" class="font-semibold">Overview</h2>
-	</div>
-
+<Section title="Overview">
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-5">
 		<article class="rounded-lg border border-border bg-card p-4">
 			<div class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -58,4 +55,4 @@
 			<p class="mt-3 text-2xl font-semibold">{listCount}</p>
 		</article>
 	</div>
-</section>
+</Section>

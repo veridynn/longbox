@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { ListPlus, LoaderCircle, Trash2 } from '@lucide/svelte';
-	import DeleteListDialog from './DeleteListDialog.svelte';
-	import InlineListTitle from './InlineListTitle.svelte';
-	import type { CustomListSummary } from './lists';
+	import DeleteListDialog from '$lib/features/lists/DeleteListDialog.svelte';
+	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
+	import type { CustomListSummary } from '$lib/features/lists/lists';
+	import Section from './Section.svelte';
 
 	type Props = {
 		customLists: CustomListSummary[];
@@ -95,9 +96,8 @@
 
 <svelte:document onkeydown={handleKeydown} />
 
-<section aria-labelledby="lists-heading" class="grid gap-3">
-	<div class="flex items-center justify-between gap-3">
-		<h2 id="lists-heading" class="font-semibold">Lists</h2>
+<Section title="Lists">
+	{#snippet actions()}
 		<button
 			type="button"
 			class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted/50"
@@ -110,7 +110,7 @@
 				<kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">L</kbd>
 			</span>
 		</button>
-	</div>
+	{/snippet}
 
 	<div class="-mx-5 overflow-x-auto px-5 pb-1 sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10">
 		{#if isLoading}
@@ -179,7 +179,7 @@
 			</div>
 		{/if}
 	</div>
-</section>
+</Section>
 
 {#if selectedDeleteList}
 	<DeleteListDialog

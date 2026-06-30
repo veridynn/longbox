@@ -1,11 +1,11 @@
 import { page } from 'vite-plus/test/browser';
 import { describe, expect, it } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
-import StatsPanel from './StatsPanel.svelte';
+import OverviewPanel from './OverviewPanel.svelte';
 
-describe('StatsPanel', () => {
+describe('OverviewPanel', () => {
 	it('renders first-glance collection stats', async () => {
-		render(StatsPanel, {
+		render(OverviewPanel, {
 			favoriteCount: 2,
 			issueCount: 12,
 			listCount: 3,

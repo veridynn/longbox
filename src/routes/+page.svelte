@@ -2,18 +2,18 @@
 	import { id } from '@instantdb/svelte';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
-	import AppHeader from '$lib/components/collection/AppHeader.svelte';
-	import AuthGate from '$lib/components/collection/AuthGate.svelte';
-	import ComicSearchPanel from '$lib/components/collection/ComicSearchPanel.svelte';
-	import CreateListDialog from '$lib/components/collection/CreateListDialog.svelte';
-	import CollectionPanel from '$lib/components/collection/CollectionPanel.svelte';
-	import ListsPanel from '$lib/components/collection/ListsPanel.svelte';
-	import StatsPanel from '$lib/components/collection/StatsPanel.svelte';
+	import AppHeader from '$lib/features/main-page/AppHeader.svelte';
+	import AuthGate from '$lib/features/auth/AuthGate.svelte';
+	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
+	import CreateListDialog from '$lib/features/lists/CreateListDialog.svelte';
+	import CollectionPanel from '$lib/features/main-page/CollectionPanel.svelte';
+	import ListsPanel from '$lib/features/main-page/ListsPanel.svelte';
+	import OverviewPanel from '$lib/features/main-page/OverviewPanel.svelte';
 	import {
 		validateListName,
 		type CustomListSummary
-	} from '$lib/components/collection/lists';
-	import SaveAccountDialog from '$lib/components/collection/SaveAccountDialog.svelte';
+	} from '$lib/features/lists/lists';
+	import SaveAccountDialog from '$lib/features/auth/SaveAccountDialog.svelte';
 	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
 	import { COLLECTION_NAME } from '$lib/collection';
 	import { db } from '$lib/db';
@@ -522,7 +522,7 @@
 				onSubmit={createList}
 			/>
 
-			<StatsPanel
+			<OverviewPanel
 				{favoriteCount}
 				issueCount={collectionItems.length}
 				listCount={customLists.length}

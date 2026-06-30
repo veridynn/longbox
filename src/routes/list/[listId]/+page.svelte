@@ -3,10 +3,15 @@
 	import { ArrowLeft, EllipsisVertical, LoaderCircle, Pencil, Plus, Search, Trash2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
-	import ComicSearchPanel from '$lib/components/collection/ComicSearchPanel.svelte';
-	import DeleteListDialog from '$lib/components/collection/DeleteListDialog.svelte';
-	import InlineListTitle from '$lib/components/collection/InlineListTitle.svelte';
-	import IssueListPanel, { type IssueListViewMode } from '$lib/components/collection/IssueListPanel.svelte';
+	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
+	import DeleteListDialog from '$lib/features/lists/DeleteListDialog.svelte';
+	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
+	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
+	import {
+		storedIssueListViewMode,
+		storeIssueListViewMode,
+		type IssueListViewMode
+	} from '$lib/features/issues/view-mode';
 	import * as Popover from '$lib/components/ui/popover';
 	import {
 		customListItemKey,
@@ -14,7 +19,7 @@
 		listHasCollectionItem,
 		listHasSearchIssue,
 		stableUserIssueKey
-	} from '$lib/components/collection/lists';
+	} from '$lib/features/lists/lists';
 	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
 	import { db } from '$lib/db';
 	import { goto } from '$app/navigation';
@@ -109,7 +114,7 @@
 	let isDeletingList = $state(false);
 	let listActionError = $state<string | null>(null);
 	let listSearchQuery = $state('');
-	let listViewMode = $state<IssueListViewMode>('gallery');
+	let listViewMode = $state<IssueListViewMode>(storedIssueListViewMode());
 	let pageTitle = $state<InlineListTitle | null>(null);
 	let removingItemIds = $state<string[]>([]);
 	let shortcutModifier = $state('⌘');
@@ -542,6 +547,7 @@
 				onReorderItems={reorderListItems}
 				onViewModeChange={(viewMode) => {
 					listViewMode = viewMode;
+					storeIssueListViewMode(viewMode);
 				}}
 				{removingItemIds}
 			>

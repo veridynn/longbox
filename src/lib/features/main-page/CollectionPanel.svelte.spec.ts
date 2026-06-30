@@ -32,6 +32,7 @@ describe('CollectionPanel', () => {
 			onRemoveIssue
 		});
 
+		await expect.element(page.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
 		await expect.element(page.getByLabelText('View mode')).toBeInTheDocument();
 		await expect.element(page.getByLabelText('Search collection')).toBeInTheDocument();
 		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();

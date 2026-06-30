@@ -1,7 +1,3 @@
-<script module lang="ts">
-	export type IssueListViewMode = 'gallery' | 'list';
-</script>
-
 <script lang="ts">
 	import type { DragDropState } from '@thisux/sveltednd';
 	import { draggable, droppable } from '@thisux/sveltednd';
@@ -16,6 +12,7 @@
 		issueViewTransitionName,
 		primeIssueTransition
 	} from '$lib/comics/view-transitions.svelte.ts';
+	import type { IssueListViewMode } from './view-mode';
 	import SortableListIssueRow from './SortableListIssueRow.svelte';
 
 	type Props = {
