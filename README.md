@@ -21,7 +21,7 @@ Longbox is a personal comic collection manager for importing issues, tracking ow
 vp install && vpr dev
 ```
 
-## Todo
+## ☑️ Todo
 
 - [ ] Disable caching for development enviorment so page refreshes always show the latest changes.
 - [x] Separate development and production databases.
@@ -47,7 +47,7 @@ vp install && vpr dev
   - [ ] optemize image loading for big collection (not all at once)
         ^
 
-## Bugs
+## 🪲 Bugs
 
 - [ ] back button should be a browser back and not just pointing to the main page
 - [ ] tabing out of delete dialog closes it (should be trapped in dialog)
