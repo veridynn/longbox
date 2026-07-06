@@ -6,7 +6,7 @@
 		storeIssueListViewMode,
 		type IssueListViewMode
 	} from '$lib/features/issues/view-mode';
-	import type { CollectionItem } from '$lib/comics/types';
+	import type { CollectionItem, UserIssuePatch } from '$lib/comics/types';
 	import Section from './Section.svelte';
 
 	type Props = {
@@ -16,6 +16,7 @@
 		onAddIssue: () => void;
 		onRemoveIssue?: (itemId: string) => void | Promise<void>;
 		onReorderItems?: (items: CollectionItem[]) => void | Promise<void>;
+		onUpdateUserIssue?: (userIssueId: string, patch: UserIssuePatch) => void | Promise<void>;
 		removingItemIds?: string[];
 	};
 
@@ -26,6 +27,7 @@
 		onAddIssue,
 		onRemoveIssue,
 		onReorderItems,
+		onUpdateUserIssue,
 		removingItemIds = []
 	}: Props = $props();
 	let searchQuery = $state('');
@@ -67,7 +69,8 @@
 		{isLoading}
 		items={filteredItems}
 		onRemoveListItem={onRemoveIssue}
-		onReorderItems={onReorderItems ? reorderItems : undefined}
+		onReorderItems={onReorderItems && !searchQuery.trim() ? reorderItems : undefined}
+		{onUpdateUserIssue}
 		{removingItemIds}
 		{viewMode}
 		onViewModeChange={(nextViewMode) => {

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { ListPlus, LoaderCircle, Trash2 } from '@lucide/svelte';
-	import DeleteListDialog from '$lib/features/lists/DeleteListDialog.svelte';
+	import { ListPlus, LoaderCircle } from '@lucide/svelte';
 	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
 	import type { CustomListSummary } from '$lib/features/lists/lists';
 	import Section from './Section.svelte';
@@ -10,7 +9,6 @@
 		customLists: CustomListSummary[];
 		errorMessage?: string | null;
 		isLoading?: boolean;
-		onDeleteList: (list: CustomListSummary) => void | Promise<void>;
 		onCreateList: () => void;
 		onRenameList: (listId: string, name: string) => void | Promise<void>;
 	};
@@ -20,14 +18,9 @@
 		errorMessage = null,
 		isLoading = false,
 		onCreateList,
-		onDeleteList,
 		onRenameList
 	}: Props = $props();
 	let shortcutModifier = $state('⌘');
-	let deleteErrorMessage = $state<string | null>(null);
-	let deleteListOpen = $state(false);
-	let deletingListId = $state<string | null>(null);
-	let selectedDeleteList = $state<CustomListSummary | null>(null);
 	const existingListNames = $derived(customLists.map((list) => list.name));
 
 	onMount(() => {
@@ -61,37 +54,6 @@
 		event.preventDefault();
 		onCreateList();
 	}
-
-	function openDeleteList(list: CustomListSummary) {
-		selectedDeleteList = list;
-		deleteErrorMessage = null;
-		deleteListOpen = true;
-	}
-
-	function closeDeleteList() {
-		if (deletingListId) return;
-
-		deleteListOpen = false;
-		selectedDeleteList = null;
-		deleteErrorMessage = null;
-	}
-
-	async function deleteSelectedList() {
-		if (!selectedDeleteList || deletingListId) return;
-
-		deletingListId = selectedDeleteList.id;
-		deleteErrorMessage = null;
-
-		try {
-			await onDeleteList(selectedDeleteList);
-			deleteListOpen = false;
-			selectedDeleteList = null;
-		} catch (error) {
-			deleteErrorMessage = error instanceof Error ? error.message : 'Unable to delete this list.';
-		} finally {
-			deletingListId = null;
-		}
-	}
 </script>
 
 <svelte:document onkeydown={handleKeydown} />
@@ -112,9 +74,9 @@
 		</button>
 	{/snippet}
 
-	<div class="-mx-5 overflow-x-auto px-5 pb-1 sm:-mx-8 sm:px-8 lg:-mx-10 lg:px-10">
+	<div class="pb-1">
 		{#if isLoading}
-			<div class="flex min-h-52 items-center text-sm text-muted-foreground">
+			<div class="flex items-center text-sm text-muted-foreground">
 				<LoaderCircle class="mr-2 size-4 animate-spin" />
 				Loading lists
 			</div>
@@ -123,33 +85,28 @@
 				{errorMessage}
 			</p>
 		{:else}
-			<div class="flex w-max min-w-full gap-3">
+			<div class="flex flex-wrap gap-3">
 				{#each customLists as list (list.id)}
-					<div class="w-56 shrink-0 p-1">
-						<div class="mb-3 flex items-start justify-between gap-2">
-							<div class="min-w-0">
-								<InlineListTitle
-									class="font-medium"
-									existingNames={existingListNames}
-									isSubmitting={deletingListId === list.id}
-									name={list.name}
-									onRename={(name) => onRenameList(list.id, name)}
-								/>
-								<p class="mt-1 text-sm text-muted-foreground">{issueLabel(list.issueCount)}</p>
-							</div>
-							<button
-								type="button"
-								class="rounded-md p-1.5 text-destructive opacity-70 hover:bg-destructive/10 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
-								disabled={deletingListId === list.id}
-								aria-label={`Delete ${list.name}`}
-								onclick={() => openDeleteList(list)}
-							>
-								<Trash2 class="size-4" />
-							</button>
-						</div>
-
-						<a class="block underline-offset-4 hover:underline" href={`/list/${list.id}`}>
-							<div class="relative h-52">
+					<div class="rounded-md border border-border bg-background px-3 py-2">
+						<InlineListTitle
+							class="font-medium"
+							existingNames={existingListNames}
+							isSubmitting={false}
+							name={list.name}
+							onRename={(name) => onRenameList(list.id, name)}
+						/>
+						<a
+							class="mt-1 block text-sm text-muted-foreground underline-offset-4 hover:underline"
+							href={`/list/${list.id}`}
+						>
+							{issueLabel(list.issueCount)}
+						</a>
+						<a
+							class="mt-3 block underline-offset-4 hover:underline"
+							href={`/list/${list.id}`}
+							aria-label={`Open ${list.name}`}
+						>
+							<div class="relative h-52 w-56">
 								{#each coverSlots(list.coverImageUrls) as coverImageUrl, index (index)}
 									{#if coverImageUrl}
 										<img
@@ -180,14 +137,3 @@
 		{/if}
 	</div>
 </Section>
-
-{#if selectedDeleteList}
-	<DeleteListDialog
-		errorMessage={deleteErrorMessage}
-		isSubmitting={deletingListId === selectedDeleteList.id}
-		listName={selectedDeleteList.name}
-		bind:open={deleteListOpen}
-		onCancel={closeDeleteList}
-		onConfirm={deleteSelectedList}
-	/>
-{/if}

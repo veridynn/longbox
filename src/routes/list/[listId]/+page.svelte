@@ -20,7 +20,7 @@
 		listHasSearchIssue,
 		stableUserIssueKey
 	} from '$lib/features/lists/lists';
-	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
+	import type { CollectionItem, SearchIssue, UserIssuePatch } from '$lib/comics/types';
 	import { db } from '$lib/db';
 	import { goto } from '$app/navigation';
 
@@ -61,6 +61,9 @@
 									credits: {
 										person: {}
 									}
+								},
+								listItems: {
+									list: {}
 								}
 							}
 						}
@@ -81,6 +84,9 @@
 							volume: {
 								publisher: {}
 							}
+						},
+						listItems: {
+							list: {}
 						}
 					}
 				}
@@ -373,6 +379,21 @@
 		}
 	}
 
+	async function updateUserIssue(userIssueId: string, patch: UserIssuePatch) {
+		listActionError = null;
+
+		try {
+			await db.transact(
+				db.tx.userIssues[userIssueId].update({
+					...patch,
+					updatedAt: new Date()
+				})
+			);
+		} catch (error) {
+			listActionError = error instanceof Error ? error.message : 'Unable to update this issue.';
+		}
+	}
+
 	async function reorderListItems(orderedItems: CollectionItem[]) {
 		const list = currentList;
 		if (!list || listSearchQuery.trim()) return;
@@ -541,10 +562,12 @@
 				</p>
 			{/if}
 			<IssueListPanel
+				currentListId={currentList.id}
 				items={filteredListItems}
 				viewMode={listViewMode}
 				onRemoveListItem={removeListItem}
-				onReorderItems={reorderListItems}
+				onReorderItems={listSearchQuery.trim() ? undefined : reorderListItems}
+				onUpdateUserIssue={updateUserIssue}
 				onViewModeChange={(viewMode) => {
 					listViewMode = viewMode;
 					storeIssueListViewMode(viewMode);

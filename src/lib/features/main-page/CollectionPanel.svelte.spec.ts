@@ -38,7 +38,7 @@ describe('CollectionPanel', () => {
 		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();
 		await page.getByRole('button', { name: 'List view' }).click();
 		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
-		await page.getByRole('button', { name: 'Remove' }).click();
+		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
 		expect(onRemoveIssue).toHaveBeenCalledWith('item-1');
 	});
 

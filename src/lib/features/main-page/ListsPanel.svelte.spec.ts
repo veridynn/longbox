@@ -37,16 +37,22 @@ describe('ListsPanel', () => {
 				}
 			],
 			onCreateList: vi.fn(),
-			onDeleteList: vi.fn(),
 			onRenameList: vi.fn()
 		});
 
 		expect(document.body.textContent).toContain('To read');
 		expect(document.body.textContent).toContain('Indie picks');
 		expect(document.body.textContent).toContain('1 issue');
+		await expect
+			.element(page.getByRole('link', { name: '1 issue' }))
+			.toHaveAttribute('href', '/list/one');
+		await expect
+			.element(page.getByRole('link', { name: '0 issues' }))
+			.toHaveAttribute('href', '/list/two');
 		expect(document.querySelectorAll('a[href="/list/one"] img')).toHaveLength(5);
 		expect(document.querySelectorAll('a[href="/list/two"] [aria-hidden="true"]')).toHaveLength(5);
 		expect(page.getByLabelText('View mode')).not.toBeInTheDocument();
+		expect(page.getByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
 	});
 
 	it('opens list creation from the header button and keyboard shortcut', async () => {
@@ -54,7 +60,6 @@ describe('ListsPanel', () => {
 		render(ListsPanel, {
 			customLists: [],
 			onCreateList,
-			onDeleteList: vi.fn(),
 			onRenameList: vi.fn()
 		});
 
@@ -67,8 +72,7 @@ describe('ListsPanel', () => {
 		expect(onCreateList).toHaveBeenCalledTimes(2);
 	});
 
-	it('renames and deletes a custom list', async () => {
-		const onDeleteList = vi.fn();
+	it('renames a custom list', async () => {
 		const onRenameList = vi.fn();
 		render(ListsPanel, {
 			customLists: [
@@ -82,7 +86,6 @@ describe('ListsPanel', () => {
 				}
 			],
 			onCreateList: vi.fn(),
-			onDeleteList,
 			onRenameList
 		});
 
@@ -94,10 +97,5 @@ describe('ListsPanel', () => {
 		await page.getByRole('textbox').fill('Indie picks');
 		pressInputKey('Enter');
 		expect(onRenameList).toHaveBeenCalledWith('one', 'Indie picks');
-
-		await page.getByRole('button', { name: 'Delete To read' }).click();
-		await page.getByRole('textbox', { name: 'List name' }).fill('To read');
-		await page.getByRole('button', { name: 'Delete list' }).click();
-		expect(onDeleteList).toHaveBeenCalledTimes(1);
 	});
 });

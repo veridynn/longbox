@@ -14,7 +14,7 @@
 		type CustomListSummary
 	} from '$lib/features/lists/lists';
 	import SaveAccountDialog from '$lib/features/auth/SaveAccountDialog.svelte';
-	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
+	import type { CollectionItem, SearchIssue, UserIssuePatch } from '$lib/comics/types';
 	import { COLLECTION_NAME } from '$lib/collection';
 	import { db } from '$lib/db';
 
@@ -38,6 +38,9 @@
 							credits: {
 								person: {}
 							}
+						},
+						listItems: {
+							list: {}
 						}
 					}
 				}
@@ -221,10 +224,6 @@
 		);
 	}
 
-	async function deleteList(list: CustomListSummary) {
-		await db.transact(db.tx.userLists[list.id].delete());
-	}
-
 	async function removeCollectionIssue(itemId: string) {
 		if (removingCollectionIssueIds.includes(itemId)) return;
 
@@ -238,6 +237,22 @@
 				error instanceof Error ? error.message : 'Unable to remove this issue.';
 		} finally {
 			removingCollectionIssueIds = removingCollectionIssueIds.filter((id) => id !== itemId);
+		}
+	}
+
+	async function updateCollectionIssue(userIssueId: string, patch: UserIssuePatch) {
+		collectionActionError = null;
+
+		try {
+			await db.transact(
+				db.tx.userIssues[userIssueId].update({
+					...patch,
+					updatedAt: new Date()
+				})
+			);
+		} catch (error) {
+			collectionActionError =
+				error instanceof Error ? error.message : 'Unable to update this issue.';
 		}
 	}
 
@@ -535,7 +550,6 @@
 				errorMessage={lists.error?.message ?? null}
 				isLoading={lists.isLoading}
 				onCreateList={openCreateList}
-				onDeleteList={deleteList}
 				onRenameList={renameList}
 			/>
 
@@ -545,6 +559,7 @@
 				items={collectionItems}
 				onAddIssue={openSearch}
 				onRemoveIssue={removeCollectionIssue}
+				onUpdateUserIssue={updateCollectionIssue}
 				removingItemIds={removingCollectionIssueIds}
 			/>
 		{/if}

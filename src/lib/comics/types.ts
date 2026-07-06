@@ -23,8 +23,28 @@ export type CollectionItem = {
 		readStatus?: string;
 		updatedAt?: Date | null;
 		userNote?: string | null;
+		listItems?: Array<{
+			id: string;
+			list?:
+				| {
+						id: string;
+						name: string;
+				  }
+				| Array<{
+						id: string;
+						name: string;
+				  }>
+				| null;
+		}>;
 		issue?: CollectionIssue | null;
 	} | null;
+};
+
+export type UserIssuePatch = {
+	favorite?: boolean;
+	owned?: boolean;
+	rating?: number | null;
+	readStatus?: 'read' | 'unread';
 };
 
 export type CollectionIssue = {
