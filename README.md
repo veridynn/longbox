@@ -44,6 +44,8 @@ vp install && vpr dev
   - [ ] add filters
   - [x] add search
   - [ ] add sorts (including cutome user reorder)
+  - [ ] optemize image loading for big collection (not all at once)
+        ^
 
 ## Bugs
 
