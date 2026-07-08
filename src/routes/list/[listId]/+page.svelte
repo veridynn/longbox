@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { id } from '@instantdb/svelte';
 	import { ArrowLeft, EllipsisVertical, LoaderCircle, Pencil, Plus, Search, Trash2 } from '@lucide/svelte';
+	import { createSearchParamsSchema, useSearchParams } from 'runed/kit';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
@@ -8,6 +9,7 @@
 	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
 	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
 	import {
+		isIssueListViewMode,
 		storedIssueListViewMode,
 		storeIssueListViewMode,
 		type IssueListViewMode
@@ -20,6 +22,7 @@
 		listHasSearchIssue,
 		stableUserIssueKey
 	} from '$lib/features/lists/lists';
+	import { IssueSort, resolvedIssueSortKey, type IssueSortKey } from '$lib/features/issues/sort';
 	import type { CollectionItem, SearchIssue, UserIssuePatch } from '$lib/comics/types';
 	import { db } from '$lib/db';
 	import { goto } from '$app/navigation';
@@ -28,10 +31,20 @@
 		id: string;
 		listKey: string;
 		name: string;
+		sortKey?: string | null;
 		items: CollectionItem[];
 	};
 
 	let { params }: PageProps = $props();
+	const listSearchParams = useSearchParams(
+		createSearchParamsSchema({
+			search: { type: 'string', default: '' },
+			sort: { type: 'string', default: '' },
+			view: { type: 'string', default: '' }
+		}),
+		{ pushHistory: false, noScroll: true }
+	);
+	const defaultListViewMode = storedIssueListViewMode();
 
 	const auth = db.useAuth();
 	const listQuery = db.useQuery(() =>
@@ -119,8 +132,7 @@
 	let listMenuOpen = $state(false);
 	let isDeletingList = $state(false);
 	let listActionError = $state<string | null>(null);
-	let listSearchQuery = $state('');
-	let listViewMode = $state<IssueListViewMode>(storedIssueListViewMode());
+	let syncedSortSignature = $state('');
 	let pageTitle = $state<InlineListTitle | null>(null);
 	let removingItemIds = $state<string[]>([]);
 	let shortcutModifier = $state('⌘');
@@ -129,10 +141,17 @@
 	const listItems = $derived(
 		((currentList?.items ?? []) as CollectionItem[]).filter((item) => item.userIssue?.issue)
 	);
+	const listSearchQuery = $derived(listSearchParams.search.trim());
 	const filteredListItems = $derived(
-		listSearchQuery.trim()
-			? listItems.filter((item) => listItemSearchText(item).includes(listSearchQuery.trim().toLowerCase()))
+		listSearchQuery
+			? listItems.filter((item) => listItemSearchText(item).includes(listSearchQuery.toLowerCase()))
 			: listItems
+	);
+	const listSortKey = $derived(
+		resolvedIssueSortKey(listSearchParams.sort, currentList?.sortKey, IssueSort.Custom)
+	);
+	const listViewMode = $derived(
+		isIssueListViewMode(listSearchParams.view) ? listSearchParams.view : defaultListViewMode
 	);
 	const collectionItems = $derived(
 		(collectionQuery.data?.userIssues ?? [])
@@ -202,7 +221,7 @@
 	}
 
 	function closeListSearch() {
-		listSearchQuery = '';
+		listSearchParams.search = '';
 	}
 
 	async function readJsonResponse(response: Response) {
@@ -340,6 +359,33 @@
 		);
 	}
 
+	async function updateListSortKey(listId: string, sortKey: IssueSortKey) {
+		listActionError = null;
+
+		try {
+			await db.transact(
+				db.tx.userLists[listId].update({
+					sortKey,
+					updatedAt: new Date()
+				})
+			);
+		} catch (error) {
+			listActionError = error instanceof Error ? error.message : 'Unable to update list sort.';
+		}
+	}
+
+	function changeListSortKey(sortKey: IssueSortKey) {
+		const list = currentList;
+
+		listSearchParams.sort = sortKey;
+		if (list) persistListSortKey(list, sortKey);
+	}
+
+	function changeListViewMode(viewMode: IssueListViewMode) {
+		listSearchParams.view = viewMode;
+		storeIssueListViewMode(viewMode);
+	}
+
 	function closeDeleteList() {
 		if (isDeletingList) return;
 
@@ -396,7 +442,7 @@
 
 	async function reorderListItems(orderedItems: CollectionItem[]) {
 		const list = currentList;
-		if (!list || listSearchQuery.trim()) return;
+		if (!list || listSearchQuery || listSortKey !== IssueSort.Custom) return;
 
 		const positions = orderedItems
 			.map((item, position) => ({ id: item.id, position }))
@@ -415,6 +461,34 @@
 		}
 	}
 
+	function syncListSortUrl(sortKey: IssueSortKey) {
+		if (listSearchParams.sort !== sortKey) {
+			listSearchParams.sort = sortKey;
+		}
+	}
+
+	function syncListViewUrl(viewMode: IssueListViewMode) {
+		if (listSearchParams.view !== viewMode) {
+			listSearchParams.view = viewMode;
+		}
+	}
+
+	function persistListSortKey(list: UserList, sortKey: IssueSortKey) {
+		const signature = `${list.id}:${sortKey}:${list.sortKey ?? ''}`;
+		if (list.sortKey === sortKey || syncedSortSignature === signature) return;
+
+		syncedSortSignature = signature;
+		void updateListSortKey(list.id, sortKey);
+	}
+
+	$effect(() => {
+		const list = currentList;
+		if (!list) return;
+
+		syncListSortUrl(listSortKey);
+		syncListViewUrl(listViewMode);
+		persistListSortKey(list, listSortKey);
+	});
 </script>
 
 <svelte:head>
@@ -564,27 +638,27 @@
 			<IssueListPanel
 				currentListId={currentList.id}
 				items={filteredListItems}
+				sortKey={listSortKey}
 				viewMode={listViewMode}
 				onRemoveListItem={removeListItem}
-				onReorderItems={listSearchQuery.trim() ? undefined : reorderListItems}
+				onReorderItems={listSearchQuery ? undefined : reorderListItems}
+				onSortKeyChange={changeListSortKey}
 				onUpdateUserIssue={updateUserIssue}
-				onViewModeChange={(viewMode) => {
-					listViewMode = viewMode;
-					storeIssueListViewMode(viewMode);
-				}}
+				onViewModeChange={changeListViewMode}
 				{removingItemIds}
+				userSortable
 			>
 				{#snippet controls()}
 					<div class="relative size-9">
 						<div
 							class={`group absolute -right-1 -top-1 z-10 flex h-11 items-center p-1 transition-[width] duration-200 ease-out hover:w-[16.5rem] focus-within:w-[16.5rem] ${
-								listSearchQuery.trim() ? 'w-[16.5rem]' : 'w-11'
+								listSearchQuery ? 'w-[16.5rem]' : 'w-11'
 							}`}
 						>
 							<div class="relative flex h-9 w-full items-center overflow-hidden rounded-md">
 								<div
 									class={`pointer-events-none absolute inset-0 rounded-md bg-muted transition-opacity duration-200 ease-out group-hover:opacity-100 group-focus-within:opacity-100 ${
-										listSearchQuery.trim() ? 'opacity-100' : 'opacity-0'
+										listSearchQuery ? 'opacity-100' : 'opacity-0'
 									}`}
 								></div>
 								<div class="pointer-events-none relative inline-flex size-9 shrink-0 items-center justify-center text-muted-foreground">
@@ -592,11 +666,11 @@
 								</div>
 								<input
 									class={`relative h-9 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none transition-opacity duration-150 placeholder:text-muted-foreground focus:border-transparent focus:ring-0 group-hover:opacity-100 group-focus-within:opacity-100 ${
-										listSearchQuery.trim() ? 'opacity-100' : 'opacity-0'
+										listSearchQuery ? 'opacity-100' : 'opacity-0'
 									}`}
 									aria-label="Search list"
 									placeholder="Search list"
-									bind:value={listSearchQuery}
+									bind:value={listSearchParams.search}
 									onkeydown={(event) => {
 										if (event.key === 'Escape') {
 											closeListSearch();

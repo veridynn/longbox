@@ -4,6 +4,10 @@
 	import {
 		BookOpen,
 		BookOpenCheck,
+		Check,
+		ChevronDown,
+		ClockArrowDown,
+		ClockArrowUp,
 		Grid2x2,
 		GripVertical,
 		Heart,
@@ -12,17 +16,27 @@
 		Package,
 		PackageCheck,
 		Star,
+		ArrowDown10,
+		ArrowUp01,
 		Trash2
 	} from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { flushSync } from 'svelte';
 	import { formatDate } from '$lib/comics/format';
 	import type { CollectionIssue, CollectionItem, UserIssuePatch } from '$lib/comics/types';
+	import * as Popover from '$lib/components/ui/popover';
 	import {
 		isActiveIssueTransition,
 		issueViewTransitionName,
 		primeIssueTransition
 	} from '$lib/comics/view-transitions.svelte.ts';
+	import {
+		IssueSort,
+		issueSortLabel,
+		issueSortOptions,
+		sortedIssueItems,
+		type IssueSortKey
+	} from './sort';
 	import type { IssueListViewMode } from './view-mode';
 
 	type RatingStarTone = 'empty' | 'preview' | 'solid';
@@ -36,9 +50,12 @@
 		items: CollectionItem[];
 		onRemoveListItem?: (itemId: string) => void | Promise<void>;
 		onReorderItems?: (items: CollectionItem[]) => void | Promise<void>;
+		onSortKeyChange: (sortKey: IssueSortKey) => void | Promise<void>;
 		onUpdateUserIssue?: (userIssueId: string, patch: UserIssuePatch) => void | Promise<void>;
 		onViewModeChange: (viewMode: IssueListViewMode) => void;
 		removingItemIds?: string[];
+		sortKey: IssueSortKey;
+		userSortable?: boolean;
 		viewMode: IssueListViewMode;
 	};
 
@@ -51,16 +68,35 @@
 		items,
 		onRemoveListItem,
 		onReorderItems,
+		onSortKeyChange,
 		onUpdateUserIssue,
 		onViewModeChange,
 		removingItemIds = [],
+		sortKey,
+		userSortable = false,
 		viewMode
 	}: Props = $props();
 	let previewRatingByItemId = $state<Record<string, number>>({});
+	let sortMenuOpen = $state(false);
+	const activeSortKey = $derived(
+		!userSortable && sortKey === IssueSort.Custom ? IssueSort.IssueNumberAsc : sortKey
+	);
+	const sortOptions = $derived(issueSortOptions(userSortable));
+	const sortedItems = $derived(sortedIssueItems(items, activeSortKey));
+	const canReorder = $derived(
+		Boolean(userSortable && activeSortKey === IssueSort.Custom && onReorderItems)
+	);
+	const sortIconByKey = {
+		[IssueSort.Custom]: GripVertical,
+		[IssueSort.NewestAdded]: ClockArrowDown,
+		[IssueSort.OldestAdded]: ClockArrowUp,
+		[IssueSort.IssueNumberDesc]: ArrowDown10,
+		[IssueSort.IssueNumberAsc]: ArrowUp01
+	} satisfies Record<IssueSortKey, typeof GripVertical>;
 
 	let listGridTemplate = $derived.by(() =>
 		[
-			onReorderItems ? '2.25rem' : null,
+			canReorder ? '2.25rem' : null,
 			'max-content',
 			'minmax(10rem, max-content)',
 			'minmax(8rem, max-content)',
@@ -191,28 +227,35 @@
 	function reorderedItemsForDrop(state: DragDropState<CollectionItem>) {
 		const sourceId = state.draggedItem?.id;
 		const targetIndex = Number(state.targetContainer);
-		if (!sourceId || !Number.isInteger(targetIndex)) return items;
+		if (!sourceId || !Number.isInteger(targetIndex)) return sortedItems;
 
-		const targetId = items[targetIndex]?.id;
-		if (!targetId || sourceId === targetId) return items;
+		const targetId = sortedItems[targetIndex]?.id;
+		if (!targetId || sourceId === targetId) return sortedItems;
 
-		const sourceIndex = items.findIndex((item) => item.id === sourceId);
-		const nextTargetIndex = items.findIndex((item) => item.id === targetId);
-		if (sourceIndex === -1 || nextTargetIndex === -1) return items;
+		const sourceIndex = sortedItems.findIndex((item) => item.id === sourceId);
+		const nextTargetIndex = sortedItems.findIndex((item) => item.id === targetId);
+		if (sourceIndex === -1 || nextTargetIndex === -1) return sortedItems;
 
-		const reorderedItems = [...items];
+		const reorderedItems = [...sortedItems];
 		const [movedItem] = reorderedItems.splice(sourceIndex, 1);
 		reorderedItems.splice(nextTargetIndex, 0, movedItem);
 		return reorderedItems;
 	}
 
 	async function handleDrop(state: DragDropState<CollectionItem>) {
-		if (!onReorderItems) return;
+		if (!canReorder || !onReorderItems) return;
 
 		const orderedItems = reorderedItemsForDrop(state);
-		if (hasSameOrder(items, orderedItems)) return;
+		if (hasSameOrder(sortedItems, orderedItems)) return;
 
 		await onReorderItems(orderedItems);
+	}
+
+	function changeSortKey(nextSortKey: IssueSortKey) {
+		sortMenuOpen = false;
+		if (nextSortKey !== activeSortKey) {
+			void onSortKeyChange(nextSortKey);
+		}
 	}
 
 	function prepareIssueTransition(issue: CollectionIssue, listPosition?: number) {
@@ -220,7 +263,7 @@
 	}
 
 	$effect(() => {
-		const itemIds = new Set(items.map((item) => item.id));
+		const itemIds = new Set(sortedItems.map((item) => item.id));
 		const nextPreviewRatings = Object.fromEntries(
 			Object.entries(previewRatingByItemId).filter(([itemId]) => itemIds.has(itemId))
 		);
@@ -231,33 +274,70 @@
 	});
 </script>
 
+{#snippet sortIcon(key: IssueSortKey)}
+	{@const Icon = sortIconByKey[key]}
+	<Icon class="size-4 text-muted-foreground" aria-hidden="true" />
+{/snippet}
+
 <section>
 	<div class="flex items-center justify-between border-b border-border px-4 py-3">
-		<div class="relative grid grid-cols-2 rounded-lg bg-muted p-1" aria-label="View mode">
-			<div
-				class={`absolute left-1 top-1 size-8 rounded-md bg-white shadow-sm transition-transform duration-200 ease-out ${
-					viewMode === 'list' ? 'translate-x-8' : 'translate-x-0'
-				}`}
-				aria-hidden="true"
-			></div>
-			<button
-				type="button"
-				class={modeButtonClass('gallery')}
-				aria-label="Gallery view"
-				aria-pressed={viewMode === 'gallery'}
-				onclick={() => onViewModeChange('gallery')}
-			>
-				<Grid2x2 class="size-4" />
-			</button>
-			<button
-				type="button"
-				class={modeButtonClass('list')}
-				aria-label="List view"
-				aria-pressed={viewMode === 'list'}
-				onclick={() => onViewModeChange('list')}
-			>
-				<List class="size-4" />
-			</button>
+		<div class="flex items-center gap-2">
+			<div class="relative grid grid-cols-2 rounded-lg bg-muted p-1" aria-label="View mode">
+				<div
+					class={`absolute left-1 top-1 size-8 rounded-md bg-white shadow-sm transition-transform duration-200 ease-out ${
+						viewMode === 'list' ? 'translate-x-8' : 'translate-x-0'
+					}`}
+					aria-hidden="true"
+				></div>
+				<button
+					type="button"
+					class={modeButtonClass('gallery')}
+					aria-label="Gallery view"
+					aria-pressed={viewMode === 'gallery'}
+					onclick={() => onViewModeChange('gallery')}
+				>
+					<Grid2x2 class="size-4" />
+				</button>
+				<button
+					type="button"
+					class={modeButtonClass('list')}
+					aria-label="List view"
+					aria-pressed={viewMode === 'list'}
+					onclick={() => onViewModeChange('list')}
+				>
+					<List class="size-4" />
+				</button>
+			</div>
+			<div class="h-7 w-px bg-border" aria-hidden="true"></div>
+			<Popover.Root bind:open={sortMenuOpen}>
+				<Popover.Trigger
+					type="button"
+					class="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-2.5 text-sm font-medium hover:bg-muted"
+					aria-label={`Sort issues: ${issueSortLabel(activeSortKey)}`}
+				>
+					{@render sortIcon(activeSortKey)}
+					{issueSortLabel(activeSortKey)}
+					<ChevronDown class="size-4 text-muted-foreground" />
+				</Popover.Trigger>
+				<Popover.Content class="w-max p-1.5" align="start">
+					{#each sortOptions as option (option.value)}
+						<button
+							type="button"
+							class="flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-md px-2 py-2 text-left text-sm font-medium hover:bg-muted"
+							aria-pressed={activeSortKey === option.value}
+							onclick={() => changeSortKey(option.value)}
+						>
+							<span class="inline-flex items-center gap-2">
+								{@render sortIcon(option.value)}
+								{option.label}
+							</span>
+							{#if activeSortKey === option.value}
+								<Check class="size-4" />
+							{/if}
+						</button>
+					{/each}
+				</Popover.Content>
+			</Popover.Root>
 		</div>
 
 		<div class="flex items-center">
@@ -274,11 +354,11 @@
 		</div>
 	{:else if errorMessage}
 		<p class="px-4 py-6 text-sm text-destructive">{errorMessage}</p>
-	{:else if !items.length && empty}
+	{:else if !sortedItems.length && empty}
 		{@render empty()}
 	{:else if viewMode === 'gallery'}
 		<ul class="grid grid-cols-2 gap-4 px-4 py-4 sm:grid-cols-3 md:grid-cols-4">
-			{#each items as item (item.id)}
+			{#each sortedItems as item (item.id)}
 				{@const issue = item.userIssue?.issue}
 				{#if issue}
 					<li class="group relative">
@@ -320,7 +400,7 @@
 	{:else}
 		<div class="overflow-x-auto">
 			<ul class="inline-grid min-w-full text-sm" style:grid-template-columns={listGridTemplate}>
-				{#each items as item, index (item.id)}
+				{#each sortedItems as item, index (item.id)}
 					{@const issue = item.userIssue?.issue}
 					{#if issue}
 						<li
@@ -341,7 +421,7 @@
 							}}
 							class="group col-span-full grid grid-cols-subgrid items-center border-b border-border bg-background transition"
 						>
-							{#if onReorderItems}
+							{#if canReorder}
 								<div class="px-2 py-2">
 									<button
 										type="button"

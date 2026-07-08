@@ -39,13 +39,12 @@ vp install && vpr dev
   - [ ] add edit mode
     - [ ] add dnd
     - [ ] add delete
-      - [ ] Warn before removing a collection issue that is used in lists: show the affected lists, let the user delete or keep it, and include a toggle to reuse that choice
-    - [ ] make reorder handle default to the component (missing in mainpage)
+      - [ ] Warn before removing a collection issue that is used in lists: show the affected lists, let the user delete or keep it, and bulk actions include a toggle to reuse that choice
   - [ ] add filters
   - [x] add search
-  - [ ] add sorts (including cutome user reorder)
+  - [x] add sorts
+  - [ ] how to handle custome order?
   - [ ] optemize image loading for big collection (not all at once)
-        ^
 
 ## 🪲 Bugs
 

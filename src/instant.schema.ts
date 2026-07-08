@@ -97,6 +97,7 @@ const _schema = i.schema({
 			createdAt: i.date(),
 			listKey: i.string().unique().indexed(),
 			name: i.string().indexed(),
+			sortKey: i.string().optional(),
 			updatedAt: i.date()
 		}),
 		userListItems: i.entity({

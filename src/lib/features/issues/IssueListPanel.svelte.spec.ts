@@ -3,6 +3,7 @@ import { page } from 'vite-plus/test/browser';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
 import IssueListPanel from './IssueListPanel.svelte';
+import { IssueSort } from './sort';
 
 const items = [
 	{
@@ -57,14 +58,20 @@ const empty = createRawSnippet(() => ({
 	render: () => '<p>No issues yet</p>'
 }));
 
+function renderPanel(props = {}) {
+	return render(IssueListPanel, {
+		items,
+		onSortKeyChange: vi.fn(),
+		onViewModeChange: vi.fn(),
+		sortKey: IssueSort.NewestAdded,
+		viewMode: 'gallery',
+		...props
+	});
+}
+
 describe('IssueListPanel', () => {
 	it('renders gallery cover cards with overlay info', async () => {
-		render(IssueListPanel, {
-			items,
-			onRemoveListItem: vi.fn(),
-			onViewModeChange: vi.fn(),
-			viewMode: 'gallery'
-		});
+		renderPanel({ onRemoveListItem: vi.fn() });
 
 		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();
 		await expect.element(page.getByText('Image · Jan 2024')).toBeInTheDocument();
@@ -73,24 +80,20 @@ describe('IssueListPanel', () => {
 
 	it('switches to list mode through the view callback', async () => {
 		const onViewModeChange = vi.fn();
-		render(IssueListPanel, {
-			items,
-			onViewModeChange,
-			viewMode: 'gallery'
-		});
+		renderPanel({ onViewModeChange });
 
 		await page.getByRole('button', { name: 'List view' }).click();
 
 		expect(onViewModeChange).toHaveBeenCalledWith('list');
 	});
 
-	it('shows remove and drag controls only when callbacks are provided', async () => {
+	it('shows remove and drag controls only when custom sorting is enabled', async () => {
 		const onRemoveListItem = vi.fn();
-		render(IssueListPanel, {
-			items,
+		const { unmount } = renderPanel({
 			onRemoveListItem,
 			onReorderItems: vi.fn(),
-			onViewModeChange: vi.fn(),
+			sortKey: IssueSort.Custom,
+			userSortable: true,
 			viewMode: 'list'
 		});
 
@@ -98,13 +101,21 @@ describe('IssueListPanel', () => {
 		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
 
 		expect(onRemoveListItem).toHaveBeenCalledWith('item-1');
+		await unmount();
+
+		renderPanel({
+			onReorderItems: vi.fn(),
+			sortKey: IssueSort.IssueNumberAsc,
+			userSortable: true,
+			viewMode: 'list'
+		});
+
+		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
 	});
 
 	it('renders dense list columns and list membership links', async () => {
-		render(IssueListPanel, {
+		renderPanel({
 			currentListId: 'list-b',
-			items,
-			onViewModeChange: vi.fn(),
 			viewMode: 'list'
 		});
 
@@ -122,10 +133,8 @@ describe('IssueListPanel', () => {
 
 	it('updates status icons and rating inline', async () => {
 		const onUpdateUserIssue = vi.fn();
-		render(IssueListPanel, {
-			items,
+		renderPanel({
 			onUpdateUserIssue,
-			onViewModeChange: vi.fn(),
 			viewMode: 'list'
 		});
 
@@ -141,10 +150,8 @@ describe('IssueListPanel', () => {
 	});
 
 	it('previews added and removed rating stars on hover', async () => {
-		render(IssueListPanel, {
-			items,
+		renderPanel({
 			onUpdateUserIssue: vi.fn(),
-			onViewModeChange: vi.fn(),
 			viewMode: 'list'
 		});
 
@@ -162,34 +169,54 @@ describe('IssueListPanel', () => {
 	});
 
 	it('renders loading, error, and empty states', async () => {
-		const { unmount } = render(IssueListPanel, {
+		const { unmount } = renderPanel({
 			empty,
 			isLoading: true,
-			items: [],
-			onViewModeChange: vi.fn(),
-			viewMode: 'gallery'
+			items: []
 		});
 
 		await expect.element(page.getByText('Loading issues')).toBeInTheDocument();
 		await unmount();
 
-		const errorRender = render(IssueListPanel, {
+		const errorRender = renderPanel({
 			errorMessage: 'Unable to load issues.',
-			items: [],
-			onViewModeChange: vi.fn(),
-			viewMode: 'gallery'
+			items: []
 		});
 
 		await expect.element(page.getByText('Unable to load issues.')).toBeInTheDocument();
 		await errorRender.unmount();
 
-		render(IssueListPanel, {
+		renderPanel({
 			empty,
-			items: [],
-			onViewModeChange: vi.fn(),
-			viewMode: 'gallery'
+			items: []
 		});
 
 		await expect.element(page.getByText('No issues yet')).toBeInTheDocument();
+	});
+
+	it('hides custom sorting when user sorting is disabled', async () => {
+		renderPanel({ userSortable: false });
+
+		await page.getByRole('button', { name: /Sort issues:/ }).click();
+		expect(page.getByRole('button', { name: 'Custom order', exact: true })).not.toBeInTheDocument();
+	});
+
+	it('shows custom sorting when user sorting is enabled', async () => {
+		renderPanel({ sortKey: IssueSort.Custom, userSortable: true });
+
+		await page.getByRole('button', { name: /Sort issues:/ }).click();
+		await expect
+			.element(page.getByRole('button', { name: 'Custom order', exact: true }))
+			.toBeInTheDocument();
+	});
+
+	it('emits sort changes from the sort menu', async () => {
+		const onSortKeyChange = vi.fn();
+		renderPanel({ onSortKeyChange });
+
+		await page.getByRole('button', { name: /Sort issues:/ }).click();
+		await page.getByRole('button', { name: 'Issue # descending' }).click();
+
+		expect(onSortKeyChange).toHaveBeenCalledWith(IssueSort.IssueNumberDesc);
 	});
 });

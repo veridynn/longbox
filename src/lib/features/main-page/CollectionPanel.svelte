@@ -7,6 +7,7 @@
 		type IssueListViewMode
 	} from '$lib/features/issues/view-mode';
 	import type { CollectionItem, UserIssuePatch } from '$lib/comics/types';
+	import { IssueSort, type IssueSortKey } from '$lib/features/issues/sort';
 	import Section from './Section.svelte';
 
 	type Props = {
@@ -15,7 +16,6 @@
 		items: CollectionItem[];
 		onAddIssue: () => void;
 		onRemoveIssue?: (itemId: string) => void | Promise<void>;
-		onReorderItems?: (items: CollectionItem[]) => void | Promise<void>;
 		onUpdateUserIssue?: (userIssueId: string, patch: UserIssuePatch) => void | Promise<void>;
 		removingItemIds?: string[];
 	};
@@ -26,11 +26,11 @@
 		items,
 		onAddIssue,
 		onRemoveIssue,
-		onReorderItems,
 		onUpdateUserIssue,
 		removingItemIds = []
 	}: Props = $props();
 	let searchQuery = $state('');
+	let sortKey = $state<IssueSortKey>(IssueSort.NewestAdded);
 	let viewMode = $state<IssueListViewMode>(storedIssueListViewMode());
 	const filteredItems = $derived(
 		searchQuery.trim()
@@ -56,11 +56,6 @@
 		searchQuery = '';
 	}
 
-	async function reorderItems(orderedItems: CollectionItem[]) {
-		if (searchQuery.trim() || !onReorderItems) return;
-
-		await onReorderItems(orderedItems);
-	}
 </script>
 
 <Section title="Collection">
@@ -69,7 +64,10 @@
 		{isLoading}
 		items={filteredItems}
 		onRemoveListItem={onRemoveIssue}
-		onReorderItems={onReorderItems && !searchQuery.trim() ? reorderItems : undefined}
+		{sortKey}
+		onSortKeyChange={(nextSortKey) => {
+			sortKey = nextSortKey;
+		}}
 		{onUpdateUserIssue}
 		{removingItemIds}
 		{viewMode}
