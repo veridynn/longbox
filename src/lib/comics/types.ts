@@ -45,7 +45,7 @@ export type CollectionItem = {
 export type UserIssuePatch = {
 	favorite?: boolean;
 	owned?: boolean;
-	rating?: number | null;
+	rating?: number;
 	readStatus?: 'read' | 'unread';
 };
 

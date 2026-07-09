@@ -192,10 +192,10 @@ describe('importComicVineIssue', () => {
 			createdAt: expect.any(Date),
 			favorite: false,
 			owned: true,
+			rating: 0,
 			readStatus: 'unread',
 			updatedAt: expect.any(Date)
 		});
-		expect(userIssueUpdate?.payload).not.toHaveProperty('rating');
 		expect(db.transact).toHaveBeenCalledOnce();
 	});
 });

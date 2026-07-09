@@ -232,6 +232,7 @@ export async function importComicVineIssue(
 				createdAt: now,
 				favorite: false,
 				owned: true,
+				rating: 0,
 				readStatus: 'unread',
 				updatedAt: now
 			})

@@ -15,7 +15,6 @@
 		LoaderCircle,
 		Package,
 		PackageCheck,
-		Star,
 		ArrowDown10,
 		ArrowUp01,
 		Trash2
@@ -25,6 +24,7 @@
 	import { formatDate } from '$lib/comics/format';
 	import type { CollectionIssue, CollectionItem, UserIssuePatch } from '$lib/comics/types';
 	import * as Popover from '$lib/components/ui/popover';
+	import * as StarRating from '$lib/components/ui/star-rating';
 	import {
 		isActiveIssueTransition,
 		issueViewTransitionName,
@@ -38,8 +38,6 @@
 		type IssueSortKey
 	} from './sort';
 	import type { IssueListViewMode } from './view-mode';
-
-	type RatingStarTone = 'empty' | 'preview' | 'solid';
 
 	type Props = {
 		controls?: Snippet;
@@ -76,7 +74,6 @@
 		userSortable = false,
 		viewMode
 	}: Props = $props();
-	let previewRatingByItemId = $state<Record<string, number>>({});
 	let sortMenuOpen = $state(false);
 	const activeSortKey = $derived(
 		!userSortable && sortKey === IssueSort.Custom ? IssueSort.IssueNumberAsc : sortKey
@@ -163,58 +160,8 @@
 		} ${onUpdateUserIssue ? 'cursor-pointer hover:bg-muted' : 'cursor-default'}`;
 	}
 
-	function starButtonClass(tone: RatingStarTone) {
-		return `inline-flex size-6 items-center justify-center rounded-md transition ${
-			tone === 'empty' ? 'text-muted-foreground' : 'text-amber-500'
-		} ${onUpdateUserIssue ? 'cursor-pointer hover:bg-muted' : 'cursor-default'}`;
-	}
-
-	function starIconClass(tone: RatingStarTone) {
-		if (tone === 'solid') return 'size-4 fill-current opacity-100';
-		if (tone === 'preview') return 'size-4 fill-current opacity-45';
-		return 'size-4 opacity-100';
-	}
-
-	function previewRating(item: CollectionItem) {
-		return previewRatingByItemId[item.id] ?? null;
-	}
-
-	function savedRating(item: CollectionItem) {
+	function issueRating(item: CollectionItem) {
 		return item.userIssue?.rating ?? 0;
-	}
-
-	function ratingStarTone(item: CollectionItem, rating: number): RatingStarTone {
-		const saved = savedRating(item);
-		const preview = previewRating(item);
-
-		if (preview === null || preview === saved) {
-			return rating <= saved ? 'solid' : 'empty';
-		}
-
-		if (preview > saved) {
-			if (rating <= saved) return 'solid';
-			if (rating <= preview) return 'preview';
-			return 'empty';
-		}
-
-		if (rating <= preview) return 'solid';
-		if (rating <= saved) return 'preview';
-		return 'empty';
-	}
-
-	function setPreviewRating(itemId: string, rating: number) {
-		previewRatingByItemId = { ...previewRatingByItemId, [itemId]: rating };
-	}
-
-	function clearPreviewRating(itemId: string) {
-		const { [itemId]: _removed, ...nextPreviewRatings } = previewRatingByItemId;
-		previewRatingByItemId = nextPreviewRatings;
-	}
-
-	function previewRatingIfEditable(item: CollectionItem, rating: number) {
-		if (canUpdateItem(item)) {
-			setPreviewRating(item.id, rating);
-		}
 	}
 
 	function hasSameOrder(firstItems: CollectionItem[], secondItems: CollectionItem[]) {
@@ -261,17 +208,6 @@
 	function prepareIssueTransition(issue: CollectionIssue, listPosition?: number) {
 		flushSync(() => primeIssueTransition(issue, { listPosition }));
 	}
-
-	$effect(() => {
-		const itemIds = new Set(sortedItems.map((item) => item.id));
-		const nextPreviewRatings = Object.fromEntries(
-			Object.entries(previewRatingByItemId).filter(([itemId]) => itemIds.has(itemId))
-		);
-
-		if (Object.keys(nextPreviewRatings).length !== Object.keys(previewRatingByItemId).length) {
-			previewRatingByItemId = nextPreviewRatings;
-		}
-	});
 </script>
 
 {#snippet sortIcon(key: IssueSortKey)}
@@ -466,33 +402,19 @@
 								{/if}
 							</div>
 							<div></div>
-							<div class="px-3 py-2 whitespace-nowrap">
-								<div
-									class="flex items-center gap-0.5"
-									role="group"
+							<div class="px-3 py-2">
+								<StarRating.Root
+									value={issueRating(item)}
+									disabled={!canUpdateItem(item)}
 									aria-label={`Rating for ${issueTitle(item)}`}
-									onpointerleave={() => clearPreviewRating(item.id)}
+									onValueChange={(rating) => void updateUserIssue(item, { rating })}
 								>
-									{#each [1, 2, 3, 4, 5] as rating (rating)}
-										{@const tone = ratingStarTone(item, rating)}
-										<button
-											type="button"
-											class={starButtonClass(tone)}
-											data-rating-tone={tone}
-											disabled={!canUpdateItem(item)}
-											aria-label={item.userIssue?.rating === rating
-												? `Clear ${rating} star rating`
-												: `Set rating to ${rating} ${rating === 1 ? 'star' : 'stars'}`}
-											onpointerenter={() => previewRatingIfEditable(item, rating)}
-											onclick={() =>
-												void updateUserIssue(item, {
-													rating: item.userIssue?.rating === rating ? null : rating
-												})}
-										>
-											<Star class={starIconClass(tone)} />
-										</button>
-									{/each}
-								</div>
+									{#snippet children({ items })}
+										{#each items as ratingItem (ratingItem.index)}
+											<StarRating.Star {...ratingItem} />
+										{/each}
+									{/snippet}
+								</StarRating.Root>
 							</div>
 							<div class="px-2 py-2">
 								<div class="flex items-center gap-0.5">

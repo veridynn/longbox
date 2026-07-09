@@ -9,8 +9,7 @@
 		HeartOff,
 		LoaderCircle,
 		Package,
-		PackageCheck,
-		Star
+		PackageCheck
 	} from '@lucide/svelte';
 	import { CalendarDate, DateFormatter, getLocalTimeZone, type DateValue } from '@internationalized/date';
 	import { flushSync } from 'svelte';
@@ -19,8 +18,8 @@
 	import { Calendar } from '$lib/components/ui/calendar';
 	import { Input } from '$lib/components/ui/input';
 	import * as Popover from '$lib/components/ui/popover';
+	import * as StarRating from '$lib/components/ui/star-rating';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
 	import { formatDate } from '$lib/comics/format';
 	import type { CollectionIssue } from '$lib/comics/types';
 	import {
@@ -48,7 +47,7 @@
 		acquiredAt: string;
 		favorite: boolean;
 		owned: boolean;
-		rating: number | null;
+		rating: number;
 		readStatus: 'read' | 'unread';
 		userNote: string;
 	};
@@ -115,8 +114,6 @@
 	const details = $derived(detailRows(issue));
 	const noteStatus = $derived(statusText(saveStatus));
 	const acquiredDateValue = $derived(calendarDateFromInput(draft.acquiredAt));
-	const ratingValue = $derived(draft.rating ? String(draft.rating) : '');
-
 	const dateFormatter = new DateFormatter('en-US', {
 		dateStyle: 'medium'
 	});
@@ -147,7 +144,7 @@
 			acquiredAt: '',
 			favorite: false,
 			owned: false,
-			rating: null,
+			rating: 0,
 			readStatus: 'unread',
 			userNote: ''
 		};
@@ -162,7 +159,7 @@
 			acquiredAt: dateInputValue(userIssueValue.acquiredAt),
 			favorite: userIssueValue.favorite,
 			owned: userIssueValue.owned,
-			rating: userIssueValue.rating ?? null,
+			rating: userIssueValue.rating ?? 0,
 			readStatus: userIssueValue.readStatus === 'read' ? 'read' : 'unread',
 			userNote: userIssueValue.userNote ?? ''
 		};
@@ -300,8 +297,8 @@
 		updateDraft({ favorite: checked });
 	}
 
-	function setRatingValue(value: string) {
-		updateDraft({ rating: value ? Number(value) : null });
+	function setRating(rating: number) {
+		updateDraft({ rating });
 	}
 
 	function cancelNoteEdit() {
@@ -521,36 +518,18 @@
 
 									<div>
 										<p class="text-xs font-semibold text-muted-foreground uppercase">Rating</p>
-										<div class="mt-2 flex flex-wrap items-center gap-2">
-											<ToggleGroup.Root
-												type="single"
-												value={ratingValue}
-												onValueChange={setRatingValue}
-												size="sm"
-												spacing={1}
+										<div class="mt-2 flex items-center gap-2">
+											<StarRating.Root
+												value={draft.rating}
 												aria-label="Issue rating"
+												onValueChange={setRating}
 											>
-											{#each [1, 2, 3, 4, 5] as rating (rating)}
-													<ToggleGroup.Item
-														value={String(rating)}
-														class="text-muted-foreground data-[state=on]:bg-transparent data-[state=on]:text-amber-500 data-[state=on]:*:[svg]:fill-amber-400 data-[state=on]:*:[svg]:stroke-amber-500"
-													aria-label={draft.rating === rating
-														? `Clear ${rating} star rating`
-														: `Set rating to ${rating} ${rating === 1 ? 'star' : 'stars'}`}
-												>
-													<Star
-														class={`size-5 ${
-															draft.rating && rating <= draft.rating
-																? 'fill-amber-400 text-amber-500'
-																: ''
-														}`}
-													/>
-													</ToggleGroup.Item>
-											{/each}
-											</ToggleGroup.Root>
-											<span class="ml-1 text-sm text-muted-foreground">
-												{draft.rating ? `${draft.rating}/5` : 'Unrated'}
-											</span>
+												{#snippet children({ items })}
+													{#each items as item (item.index)}
+														<StarRating.Star {...item} />
+													{/each}
+												{/snippet}
+											</StarRating.Root>
 										</div>
 									</div>
 

@@ -45,12 +45,13 @@ vp install && vpr dev
   - [x] add sorts
   - [ ] how to handle custome order?
   - [ ] optemize image loading for big collection (not all at once)
+  - [x] rating
+    - [x] remove the fraction numeric display in issue detail page
 
 ## 🪲 Bugs
 
 - [ ] back button should be a browser back and not just pointing to the main page
 - [ ] tabing out of delete dialog closes it (should be trapped in dialog)
-- [ ] rating fire network requests on hover?
 
 ## 📜 Scripts
 

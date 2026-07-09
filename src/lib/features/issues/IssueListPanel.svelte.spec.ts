@@ -41,6 +41,7 @@ const items = [
 			id: 'user-issue-2',
 			favorite: false,
 			owned: false,
+			rating: 0,
 			readStatus: 'unread',
 			issue: {
 				id: 'issue-2',
@@ -57,6 +58,12 @@ const items = [
 const empty = createRawSnippet(() => ({
 	render: () => '<p>No issues yet</p>'
 }));
+
+function pressRating(label: string, key: string) {
+	document
+		.querySelector(`[aria-label="${label}"]`)
+		?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
+}
 
 function renderPanel(props = {}) {
 	return render(IssueListPanel, {
@@ -141,31 +148,12 @@ describe('IssueListPanel', () => {
 		await page.getByRole('button', { name: 'Mark as not owned' }).click();
 		await page.getByRole('button', { name: 'Mark as unread' }).click();
 		await page.getByRole('button', { name: 'Remove favorite' }).click();
-		await page.getByRole('button', { name: 'Clear 4 star rating' }).click();
+		pressRating('Rating for Saga #1: First', 'ArrowLeft');
 
 		expect(onUpdateUserIssue).toHaveBeenNthCalledWith(1, 'user-issue-1', { owned: false });
 		expect(onUpdateUserIssue).toHaveBeenNthCalledWith(2, 'user-issue-1', { readStatus: 'unread' });
 		expect(onUpdateUserIssue).toHaveBeenNthCalledWith(3, 'user-issue-1', { favorite: false });
-		expect(onUpdateUserIssue).toHaveBeenNthCalledWith(4, 'user-issue-1', { rating: null });
-	});
-
-	it('previews added and removed rating stars on hover', async () => {
-		renderPanel({
-			onUpdateUserIssue: vi.fn(),
-			viewMode: 'list'
-		});
-
-		const secondStar = page.getByRole('button', { name: 'Set rating to 2 stars' }).first();
-		const fourthStar = page.getByRole('button', { name: 'Clear 4 star rating' });
-		const fifthStar = page.getByRole('button', { name: 'Set rating to 5 stars' }).first();
-
-		await fifthStar.hover();
-		await expect.element(fourthStar).toHaveAttribute('data-rating-tone', 'solid');
-		await expect.element(fifthStar).toHaveAttribute('data-rating-tone', 'preview');
-
-		await secondStar.hover();
-		await expect.element(secondStar).toHaveAttribute('data-rating-tone', 'solid');
-		await expect.element(fourthStar).toHaveAttribute('data-rating-tone', 'preview');
+		expect(onUpdateUserIssue).toHaveBeenNthCalledWith(4, 'user-issue-1', { rating: 3 });
 	});
 
 	it('renders loading, error, and empty states', async () => {
