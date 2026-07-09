@@ -1,18 +1,37 @@
-export type IssueListViewMode = 'gallery' | 'list';
+export const IssueListView = {
+	Gallery: 'gallery',
+	List: 'list'
+} as const;
 
-const STORAGE_KEY = 'longbox.issueListViewMode';
+export type IssueListViewMode = (typeof IssueListView)[keyof typeof IssueListView];
 
 export function isIssueListViewMode(value: string | null | undefined): value is IssueListViewMode {
-	return value === 'list' || value === 'gallery';
+	return value === IssueListView.List || value === IssueListView.Gallery;
 }
 
-export function storedIssueListViewMode(): IssueListViewMode {
-	if (typeof localStorage === 'undefined') return 'gallery';
-
-	const value = localStorage.getItem(STORAGE_KEY);
-	return isIssueListViewMode(value) ? value : 'gallery';
+export function resolvedIssueListViewMode(
+	urlViewMode: string | null | undefined,
+	savedViewMode: string | null | undefined,
+	fallback: IssueListViewMode
+) {
+	if (isIssueListViewMode(urlViewMode)) return urlViewMode;
+	if (isIssueListViewMode(savedViewMode)) return savedViewMode;
+	return fallback;
 }
 
-export function storeIssueListViewMode(viewMode: IssueListViewMode) {
-	localStorage.setItem(STORAGE_KEY, viewMode);
+export function storedIssueListViewMode(key: string) {
+	try {
+		const value = localStorage.getItem(key);
+		return isIssueListViewMode(value) ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveIssueListViewMode(key: string, value: IssueListViewMode) {
+	try {
+		localStorage.setItem(key, value);
+	} catch {
+		// Ignore unavailable storage; the URL still carries the active state.
+	}
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { id } from '@instantdb/svelte';
 	import { LoaderCircle } from '@lucide/svelte';
+	import { createSearchParamsSchema, useSearchParams } from 'runed/kit';
 	import { goto } from '$app/navigation';
 	import AppHeader from '$lib/features/main-page/AppHeader.svelte';
 	import AuthGate from '$lib/features/auth/AuthGate.svelte';
@@ -14,10 +15,33 @@
 		type CustomListSummary
 	} from '$lib/features/lists/lists';
 	import SaveAccountDialog from '$lib/features/auth/SaveAccountDialog.svelte';
+	import {
+		IssueListView,
+		isIssueListViewMode,
+		resolvedIssueListViewMode,
+		saveIssueListViewMode,
+		storedIssueListViewMode
+	} from '$lib/features/issues/view-mode';
+	import {
+		IssueSort,
+		isAllowedIssueSortKey,
+		resolvedIssueSortKey,
+		saveIssueSortKey,
+		storedIssueSortKey
+	} from '$lib/features/issues/sort';
 	import type { CollectionItem, SearchIssue, UserIssuePatch } from '$lib/comics/types';
 	import { COLLECTION_NAME } from '$lib/collection';
 	import { db } from '$lib/db';
 
+	const COLLECTION_SORT_STORAGE_KEY = 'longbox.collection.sort';
+	const COLLECTION_VIEW_STORAGE_KEY = 'longbox.collection.view';
+	const collectionSearchParams = useSearchParams(
+		createSearchParamsSchema({
+			sort: { type: 'string', default: '' },
+			view: { type: 'string', default: '' }
+		}),
+		{ pushHistory: false, noScroll: true }
+	);
 	const auth = db.useAuth();
 	const collection = db.useQuery(() =>
 		auth.user
@@ -93,6 +117,21 @@
 	let isCreatingList = $state(false);
 	let collectionActionError = $state<string | null>(null);
 	let removingCollectionIssueIds = $state<string[]>([]);
+	const collectionSortKey = $derived(
+		resolvedIssueSortKey(
+			collectionSearchParams.sort,
+			storedIssueSortKey(COLLECTION_SORT_STORAGE_KEY, false),
+			IssueSort.NewestAdded,
+			false
+		)
+	);
+	const collectionViewMode = $derived(
+		resolvedIssueListViewMode(
+			collectionSearchParams.view,
+			storedIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY),
+			IssueListView.Gallery
+		)
+	);
 
 	let collectionItems = $derived.by(() =>
 		(collection.data?.userIssues ?? [])
@@ -144,6 +183,14 @@
 	function isInCollection(issue: SearchIssue) {
 		return collectionComicVineIds.has(issue.id);
 	}
+
+	$effect(() => {
+		const sortKey = collectionSearchParams.sort;
+		const viewMode = collectionSearchParams.view;
+
+		if (isAllowedIssueSortKey(sortKey, false)) saveIssueSortKey(COLLECTION_SORT_STORAGE_KEY, sortKey);
+		if (isIssueListViewMode(viewMode)) saveIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY, viewMode);
+	});
 
 	function openSearch() {
 		searchOpen = true;
@@ -201,6 +248,7 @@
 						createdAt: now,
 						listKey: `${auth.user.id}:custom:${listId}`,
 						name: trimmedName,
+						sortKey: IssueSort.Custom,
 						updatedAt: now
 					})
 					.link({ owner: auth.user.id })
@@ -559,7 +607,15 @@
 				items={collectionItems}
 				onAddIssue={openSearch}
 				onRemoveIssue={removeCollectionIssue}
+				sortKey={collectionSortKey}
+				onSortKeyChange={(sortKey) => {
+					collectionSearchParams.sort = sortKey;
+				}}
 				onUpdateUserIssue={updateCollectionIssue}
+				viewMode={collectionViewMode}
+				onViewModeChange={(viewMode) => {
+					collectionSearchParams.view = viewMode;
+				}}
 				removingItemIds={removingCollectionIssueIds}
 			/>
 		{/if}

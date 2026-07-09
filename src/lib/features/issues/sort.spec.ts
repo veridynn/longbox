@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { IssueSort, isIssueSortKey, resolvedIssueSortKey, sortedIssueItems } from './sort';
+import {
+	IssueSort,
+	isAllowedIssueSortKey,
+	isIssueSortKey,
+	resolvedIssueSortKey,
+	sortedIssueItems
+} from './sort';
 
 describe('issue sorting', () => {
 	const items = [
@@ -50,6 +56,14 @@ describe('issue sorting', () => {
 		expect(isIssueSortKey(IssueSort.OldestAdded)).toBe(true);
 		expect(isIssueSortKey(IssueSort.IssueNumberAsc)).toBe(true);
 		expect(isIssueSortKey('unknown')).toBe(false);
+	});
+
+	it('rejects custom sort when user sorting is disabled', () => {
+		expect(isAllowedIssueSortKey(IssueSort.Custom, false)).toBe(false);
+		expect(isAllowedIssueSortKey(IssueSort.NewestAdded, false)).toBe(true);
+		expect(resolvedIssueSortKey(IssueSort.Custom, null, IssueSort.NewestAdded, false)).toBe(
+			IssueSort.NewestAdded
+		);
 	});
 
 	it('resolves URL sort before saved sort and fallback', () => {

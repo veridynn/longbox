@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { id } from '@instantdb/svelte';
-	import { ArrowLeft, EllipsisVertical, LoaderCircle, Pencil, Plus, Search, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, EllipsisVertical, LoaderCircle, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { createSearchParamsSchema, useSearchParams } from 'runed/kit';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
@@ -9,9 +9,11 @@
 	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
 	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
 	import {
+		IssueListView,
 		isIssueListViewMode,
+		resolvedIssueListViewMode,
+		saveIssueListViewMode,
 		storedIssueListViewMode,
-		storeIssueListViewMode,
 		type IssueListViewMode
 	} from '$lib/features/issues/view-mode';
 	import * as Popover from '$lib/components/ui/popover';
@@ -22,7 +24,12 @@
 		listHasSearchIssue,
 		stableUserIssueKey
 	} from '$lib/features/lists/lists';
-	import { IssueSort, resolvedIssueSortKey, type IssueSortKey } from '$lib/features/issues/sort';
+	import {
+		IssueSort,
+		isAllowedIssueSortKey,
+		resolvedIssueSortKey,
+		type IssueSortKey
+	} from '$lib/features/issues/sort';
 	import type { CollectionItem, SearchIssue, UserIssuePatch } from '$lib/comics/types';
 	import { db } from '$lib/db';
 	import { goto } from '$app/navigation';
@@ -38,13 +45,11 @@
 	let { params }: PageProps = $props();
 	const listSearchParams = useSearchParams(
 		createSearchParamsSchema({
-			search: { type: 'string', default: '' },
 			sort: { type: 'string', default: '' },
 			view: { type: 'string', default: '' }
 		}),
 		{ pushHistory: false, noScroll: true }
 	);
-	const defaultListViewMode = storedIssueListViewMode();
 
 	const auth = db.useAuth();
 	const listQuery = db.useQuery(() =>
@@ -141,17 +146,16 @@
 	const listItems = $derived(
 		((currentList?.items ?? []) as CollectionItem[]).filter((item) => item.userIssue?.issue)
 	);
-	const listSearchQuery = $derived(listSearchParams.search.trim());
-	const filteredListItems = $derived(
-		listSearchQuery
-			? listItems.filter((item) => listItemSearchText(item).includes(listSearchQuery.toLowerCase()))
-			: listItems
-	);
+	const filteredListItems = $derived(listItems);
 	const listSortKey = $derived(
 		resolvedIssueSortKey(listSearchParams.sort, currentList?.sortKey, IssueSort.Custom)
 	);
 	const listViewMode = $derived(
-		isIssueListViewMode(listSearchParams.view) ? listSearchParams.view : defaultListViewMode
+		resolvedIssueListViewMode(
+			listSearchParams.view,
+			currentList ? storedIssueListViewMode(listViewStorageKey(currentList.id)) : null,
+			IssueListView.Gallery
+		)
 	);
 	const collectionItems = $derived(
 		(collectionQuery.data?.userIssues ?? [])
@@ -204,24 +208,6 @@
 
 	function isCollectionItemInList(item: CollectionItem) {
 		return listHasCollectionItem(listItems, item, addingUserIssueIds);
-	}
-
-	function listItemSearchText(item: CollectionItem) {
-		const issue = item.userIssue?.issue;
-		return [
-			issue?.volume?.name,
-			issue?.issueNumber,
-			issue?.name,
-			issue?.volume?.publisher?.name,
-			issue?.summary
-		]
-			.filter(Boolean)
-			.join(' ')
-			.toLowerCase();
-	}
-
-	function closeListSearch() {
-		listSearchParams.search = '';
 	}
 
 	async function readJsonResponse(response: Response) {
@@ -375,15 +361,11 @@
 	}
 
 	function changeListSortKey(sortKey: IssueSortKey) {
-		const list = currentList;
-
 		listSearchParams.sort = sortKey;
-		if (list) persistListSortKey(list, sortKey);
 	}
 
 	function changeListViewMode(viewMode: IssueListViewMode) {
 		listSearchParams.view = viewMode;
-		storeIssueListViewMode(viewMode);
 	}
 
 	function closeDeleteList() {
@@ -442,7 +424,7 @@
 
 	async function reorderListItems(orderedItems: CollectionItem[]) {
 		const list = currentList;
-		if (!list || listSearchQuery || listSortKey !== IssueSort.Custom) return;
+		if (!list || listSortKey !== IssueSort.Custom) return;
 
 		const positions = orderedItems
 			.map((item, position) => ({ id: item.id, position }))
@@ -461,16 +443,8 @@
 		}
 	}
 
-	function syncListSortUrl(sortKey: IssueSortKey) {
-		if (listSearchParams.sort !== sortKey) {
-			listSearchParams.sort = sortKey;
-		}
-	}
-
-	function syncListViewUrl(viewMode: IssueListViewMode) {
-		if (listSearchParams.view !== viewMode) {
-			listSearchParams.view = viewMode;
-		}
+	function listViewStorageKey(listId: string) {
+		return `longbox.list.${listId}.view`;
 	}
 
 	function persistListSortKey(list: UserList, sortKey: IssueSortKey) {
@@ -484,10 +458,11 @@
 	$effect(() => {
 		const list = currentList;
 		if (!list) return;
+		const sortKey = listSearchParams.sort;
+		const viewMode = listSearchParams.view;
 
-		syncListSortUrl(listSortKey);
-		syncListViewUrl(listViewMode);
-		persistListSortKey(list, listSortKey);
+		if (isAllowedIssueSortKey(sortKey, true)) persistListSortKey(list, sortKey);
+		if (isIssueListViewMode(viewMode)) saveIssueListViewMode(listViewStorageKey(list.id), viewMode);
 	});
 </script>
 
@@ -641,46 +616,14 @@
 				sortKey={listSortKey}
 				viewMode={listViewMode}
 				onRemoveListItem={removeListItem}
-				onReorderItems={listSearchQuery ? undefined : reorderListItems}
+				onReorderItems={reorderListItems}
 				onSortKeyChange={changeListSortKey}
 				onUpdateUserIssue={updateUserIssue}
 				onViewModeChange={changeListViewMode}
 				{removingItemIds}
 				userSortable
 			>
-				{#snippet controls()}
-					<div class="relative size-9">
-						<div
-							class={`group absolute -right-1 -top-1 z-10 flex h-11 items-center p-1 transition-[width] duration-200 ease-out hover:w-[16.5rem] focus-within:w-[16.5rem] ${
-								listSearchQuery ? 'w-[16.5rem]' : 'w-11'
-							}`}
-						>
-							<div class="relative flex h-9 w-full items-center overflow-hidden rounded-md">
-								<div
-									class={`pointer-events-none absolute inset-0 rounded-md bg-muted transition-opacity duration-200 ease-out group-hover:opacity-100 group-focus-within:opacity-100 ${
-										listSearchQuery ? 'opacity-100' : 'opacity-0'
-									}`}
-								></div>
-								<div class="pointer-events-none relative inline-flex size-9 shrink-0 items-center justify-center text-muted-foreground">
-									<Search class="size-4" />
-								</div>
-								<input
-									class={`relative h-9 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none transition-opacity duration-150 placeholder:text-muted-foreground focus:border-transparent focus:ring-0 group-hover:opacity-100 group-focus-within:opacity-100 ${
-										listSearchQuery ? 'opacity-100' : 'opacity-0'
-									}`}
-									aria-label="Search list"
-									placeholder="Search list"
-									bind:value={listSearchParams.search}
-									onkeydown={(event) => {
-										if (event.key === 'Escape') {
-											closeListSearch();
-										}
-									}}
-								/>
-							</div>
-						</div>
-					</div>
-				{/snippet}
+				<!-- Inline list search is disabled while search is not URL-backed. -->
 
 				{#snippet empty()}
 					<div class="grid gap-3 px-4 py-12 text-center">

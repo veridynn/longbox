@@ -2,6 +2,7 @@ import { page } from 'vite-plus/test/browser';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
 import CollectionPanel from './CollectionPanel.svelte';
+import { IssueSort } from '$lib/features/issues/sort';
 
 const items = [
 	{
@@ -29,14 +30,18 @@ describe('CollectionPanel', () => {
 			isLoading: false,
 			items,
 			onAddIssue: vi.fn(),
-			onRemoveIssue
+			onRemoveIssue,
+			onSortKeyChange: vi.fn(),
+			onViewModeChange: vi.fn(),
+			sortKey: IssueSort.NewestAdded,
+			viewMode: 'list'
 		});
 
 		await expect.element(page.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
 		await expect.element(page.getByLabelText('View mode')).toBeInTheDocument();
-		await expect.element(page.getByLabelText('Search collection')).toBeInTheDocument();
-		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();
-		await page.getByRole('button', { name: 'List view' }).click();
+		expect(page.getByLabelText('Search collection')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('link', { name: '#1' })).toBeInTheDocument();
+		await expect.element(page.getByText('Saga')).toBeInTheDocument();
 		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
 		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
 		expect(onRemoveIssue).toHaveBeenCalledWith('item-1');
@@ -48,7 +53,11 @@ describe('CollectionPanel', () => {
 			errorMessage: null,
 			isLoading: false,
 			items: [],
-			onAddIssue
+			onAddIssue,
+			onSortKeyChange: vi.fn(),
+			onViewModeChange: vi.fn(),
+			sortKey: IssueSort.NewestAdded,
+			viewMode: 'gallery'
 		});
 
 		await expect.element(page.getByText('Your collection is empty')).toBeInTheDocument();

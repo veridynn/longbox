@@ -1,28 +1,23 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { storedIssueListViewMode, storeIssueListViewMode } from './view-mode';
+import { describe, expect, it } from 'vitest';
+import { IssueListView, isIssueListViewMode, resolvedIssueListViewMode } from './view-mode';
 
-const storage = new Map<string, string>();
-
-describe('issue list view mode storage', () => {
-	beforeEach(() => {
-		storage.clear();
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			value: {
-				clear: () => storage.clear(),
-				getItem: (key: string) => storage.get(key) ?? null,
-				setItem: (key: string, value: string) => storage.set(key, value)
-			}
-		});
+describe('issue list view mode', () => {
+	it('recognizes valid view modes', () => {
+		expect(isIssueListViewMode('gallery')).toBe(true);
+		expect(isIssueListViewMode('list')).toBe(true);
+		expect(isIssueListViewMode('bad')).toBe(false);
+		expect(isIssueListViewMode(null)).toBe(false);
 	});
 
-	it('stores valid view modes and falls back for invalid values', () => {
-		expect(storedIssueListViewMode()).toBe('gallery');
-
-		storeIssueListViewMode('list');
-		expect(storedIssueListViewMode()).toBe('list');
-
-		localStorage.setItem('longbox.issueListViewMode', 'bad');
-		expect(storedIssueListViewMode()).toBe('gallery');
+	it('resolves URL view before saved view and fallback', () => {
+		expect(
+			resolvedIssueListViewMode(IssueListView.List, IssueListView.Gallery, IssueListView.Gallery)
+		).toBe(IssueListView.List);
+		expect(resolvedIssueListViewMode('bad', IssueListView.List, IssueListView.Gallery)).toBe(
+			IssueListView.List
+		);
+		expect(resolvedIssueListViewMode('bad', null, IssueListView.Gallery)).toBe(
+			IssueListView.Gallery
+		);
 	});
 });

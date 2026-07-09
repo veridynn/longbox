@@ -58,11 +58,36 @@ export function issueSortLabel(sortKey: IssueSortKey) {
 export function resolvedIssueSortKey(
 	urlSortKey: string | null | undefined,
 	savedSortKey: string | null | undefined,
-	fallback: IssueSortKey
+	fallback: IssueSortKey,
+	userSortable = true
 ) {
-	if (isIssueSortKey(urlSortKey)) return urlSortKey;
-	if (isIssueSortKey(savedSortKey)) return savedSortKey;
+	if (isAllowedIssueSortKey(urlSortKey, userSortable)) return urlSortKey;
+	if (isAllowedIssueSortKey(savedSortKey, userSortable)) return savedSortKey;
 	return fallback;
+}
+
+export function isAllowedIssueSortKey(
+	value: string | null | undefined,
+	userSortable: boolean
+): value is IssueSortKey {
+	return isIssueSortKey(value) && (userSortable || value !== IssueSort.Custom);
+}
+
+export function storedIssueSortKey(key: string, userSortable = true) {
+	try {
+		const value = localStorage.getItem(key);
+		return isAllowedIssueSortKey(value, userSortable) ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveIssueSortKey(key: string, value: IssueSortKey) {
+	try {
+		localStorage.setItem(key, value);
+	} catch {
+		// Ignore unavailable storage; the URL still carries the active state.
+	}
 }
 
 function timeValue(value: Date | null | undefined) {
