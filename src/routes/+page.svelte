@@ -187,9 +187,20 @@
 	$effect(() => {
 		const sortKey = collectionSearchParams.sort;
 		const viewMode = collectionSearchParams.view;
+		const savedSortKey = storedIssueSortKey(COLLECTION_SORT_STORAGE_KEY, false);
+		const savedViewMode = storedIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY);
 
-		if (isAllowedIssueSortKey(sortKey, false)) saveIssueSortKey(COLLECTION_SORT_STORAGE_KEY, sortKey);
-		if (isIssueListViewMode(viewMode)) saveIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY, viewMode);
+		if (!sortKey && savedSortKey) {
+			collectionSearchParams.sort = savedSortKey;
+		} else if (isAllowedIssueSortKey(sortKey, false)) {
+			saveIssueSortKey(COLLECTION_SORT_STORAGE_KEY, sortKey);
+		}
+
+		if (!viewMode && savedViewMode) {
+			collectionSearchParams.view = savedViewMode;
+		} else if (isIssueListViewMode(viewMode)) {
+			saveIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY, viewMode);
+		}
 	});
 
 	function openSearch() {

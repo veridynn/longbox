@@ -460,9 +460,19 @@
 		if (!list) return;
 		const sortKey = listSearchParams.sort;
 		const viewMode = listSearchParams.view;
+		const savedViewMode = storedIssueListViewMode(listViewStorageKey(list.id));
 
-		if (isAllowedIssueSortKey(sortKey, true)) persistListSortKey(list, sortKey);
-		if (isIssueListViewMode(viewMode)) saveIssueListViewMode(listViewStorageKey(list.id), viewMode);
+		if (!sortKey && isAllowedIssueSortKey(list.sortKey, true)) {
+			listSearchParams.sort = list.sortKey;
+		} else if (isAllowedIssueSortKey(sortKey, true)) {
+			persistListSortKey(list, sortKey);
+		}
+
+		if (!viewMode && savedViewMode) {
+			listSearchParams.view = savedViewMode;
+		} else if (isIssueListViewMode(viewMode)) {
+			saveIssueListViewMode(listViewStorageKey(list.id), viewMode);
+		}
 	});
 </script>
 
