@@ -50,7 +50,7 @@ vp install && vpr dev
 
 - [ ] back button should be a browser back and not just pointing to the main page
 - [ ] tabing out of delete dialog closes it (should be trapped in dialog)
-- [ ] rating fire network actions on hover?
+- [ ] rating fire network requests on hover?
 
 ## 📜 Scripts
 
