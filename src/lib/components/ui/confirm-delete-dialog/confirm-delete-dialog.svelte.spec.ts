@@ -10,16 +10,21 @@ describe('ConfirmDeleteDialog', () => {
 		const onConfirm = vi.fn().mockResolvedValue(undefined);
 		render(ConfirmDeleteDialog);
 		confirmDelete({
-			title: 'Delete',
-			description: 'Are you sure you want to delete Favorites?',
+			title: 'Delete list',
+			description:
+				'This action cannot be undone. Your list will be deleted, but its issues will remain in your collection.',
 			input: { confirmationText: 'Favorites' },
 			onConfirm
 		});
 
 		await expect
-			.element(page.getByText('Are you sure you want to delete Favorites?'))
+			.element(
+				page.getByText(
+					'This action cannot be undone. Your list will be deleted, but its issues will remain in your collection.'
+				)
+			)
 			.toBeInTheDocument();
-		const input = page.getByPlaceholder('Enter "Favorites" to confirm.');
+		const input = page.getByRole('textbox', { name: 'Type “Favorites” to confirm' });
 		const deleteButton = page.getByRole('button', { name: 'Delete' });
 		await expect.element(deleteButton).toBeDisabled();
 
@@ -27,5 +32,19 @@ describe('ConfirmDeleteDialog', () => {
 		await deleteButton.click();
 
 		expect(onConfirm).toHaveBeenCalledOnce();
+	});
+
+	it('keeps a failed confirmation open and shows the error', async () => {
+		render(ConfirmDeleteDialog);
+		confirmDelete({
+			title: 'Remove issue?',
+			description: 'This will remove the issue.',
+			onConfirm: vi.fn().mockRejectedValue(new Error('Unable to remove this issue.'))
+		});
+
+		await page.getByRole('button', { name: 'Delete' }).click();
+
+		await expect.element(page.getByRole('alert')).toHaveTextContent('Unable to remove this issue.');
+		await expect.element(page.getByRole('heading', { name: 'Remove issue?' })).toBeInTheDocument();
 	});
 });

@@ -300,6 +300,7 @@
 		} catch (error) {
 			collectionActionError =
 				error instanceof Error ? error.message : "Unable to remove this issue.";
+			throw error;
 		} finally {
 			removingCollectionIssueIds = removingCollectionIssueIds.filter(
 				(id) => id !== itemId,

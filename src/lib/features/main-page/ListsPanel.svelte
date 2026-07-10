@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { ListPlus, LoaderCircle } from '@lucide/svelte';
-	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
-	import type { CustomListSummary } from '$lib/features/lists/lists';
+	import * as Rename from '$lib/components/ui/rename';
+	import { validateListName, type CustomListSummary } from '$lib/features/lists/lists';
 	import Section from './Section.svelte';
 
 	type Props = {
@@ -88,12 +88,13 @@
 			<div class="flex flex-wrap gap-3">
 				{#each customLists as list (list.id)}
 					<div class="rounded-md border border-border bg-background px-3 py-2">
-						<InlineListTitle
+						<Rename.Root
+							this="span"
+							value={list.name}
 							class="font-medium"
-							existingNames={existingListNames}
-							isSubmitting={false}
-							name={list.name}
-							onRename={(name) => onRenameList(list.id, name)}
+							inputClass="h-8 px-2"
+							validate={(name) => !validateListName(name.trim(), existingListNames, list.name)}
+							onSave={(name) => onRenameList(list.id, name.trim())}
 						/>
 						<a
 							class="mt-1 block text-sm text-muted-foreground underline-offset-4 hover:underline"

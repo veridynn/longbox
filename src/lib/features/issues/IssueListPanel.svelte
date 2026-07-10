@@ -54,7 +54,7 @@
 		onSortKeyChange: (sortKey: IssueSortKey) => void | Promise<void>;
 		onUpdateUserIssue?: (userIssueId: string, patch: UserIssuePatch) => void | Promise<void>;
 		onViewModeChange: (viewMode: IssueListViewMode) => void;
-		removeDescription?: string;
+		removeFromList?: boolean;
 		removingItemIds?: string[];
 		sortKey: IssueSortKey;
 		userSortable?: boolean;
@@ -73,7 +73,7 @@
 		onSortKeyChange,
 		onUpdateUserIssue,
 		onViewModeChange,
-		removeDescription = 'Are you sure you want to remove this issue?',
+		removeFromList = false,
 		removingItemIds = [],
 		sortKey,
 		userSortable = false,
@@ -210,12 +210,19 @@
 		}
 	}
 
-	function confirmRemove(event: MouseEvent, itemId: string) {
+	function confirmRemove(event: MouseEvent, item: CollectionItem) {
+		if (event.shiftKey) {
+			void onRemoveListItem?.(item.id);
+			return;
+		}
+
 		confirmDelete({
-			title: 'Delete',
-			description: removeDescription,
-			skipConfirmation: event.shiftKey,
-			onConfirm: async () => onRemoveListItem?.(itemId)
+			title: removeFromList ? 'Remove from list' : 'Delete issue',
+			description: removeFromList
+				? 'This action cannot be undone. The issue will be removed from this list, but it will remain in your collection.'
+				: 'This action cannot be undone. The issue will be deleted from your collection and every list.',
+			confirm: { text: removeFromList ? 'Remove' : 'Delete' },
+			onConfirm: async () => onRemoveListItem?.(item.id)
 		});
 	}
 
@@ -477,10 +484,10 @@
 									</button>
 									{#if onRemoveListItem}
 										<Button
-											aria-label={`Remove ${issueTitle(item)}`}
+											aria-label={`${removeFromList ? 'Remove' : 'Delete'} ${issueTitle(item)}`}
 											class="cursor-pointer"
 											disabled={removingItemIds.includes(item.id)}
-											onclick={(event) => confirmRemove(event, item.id)}
+											onclick={(event) => confirmRemove(event, item)}
 											size="icon"
 											variant="destructive"
 										>

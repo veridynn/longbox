@@ -89,11 +89,7 @@ describe('ListsPanel', () => {
 			onRenameList
 		});
 
-		(
-			Array.from(document.querySelectorAll('button')).find(
-				(button) => button.textContent?.trim() === 'To read'
-			) as HTMLButtonElement
-		).click();
+		await page.getByText('To read', { exact: true }).click();
 		await page.getByRole('textbox').fill('Indie picks');
 		pressInputKey('Enter');
 		expect(onRenameList).toHaveBeenCalledWith('one', 'Indie picks');

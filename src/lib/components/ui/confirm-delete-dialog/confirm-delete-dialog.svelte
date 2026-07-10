@@ -10,7 +10,7 @@
 			method="POST"
 			onsubmit={(event) => {
 				event.preventDefault();
-				dialogState.confirm();
+				void dialogState.confirm();
 			}}
 			class="flex flex-col gap-4"
 		>
@@ -25,14 +25,19 @@
 			{#if dialogState.options?.input}
 				<Input
 					bind:value={dialogState.inputText}
-					placeholder={`Enter "${dialogState.options.input.confirmationText}" to confirm.`}
+					disabled={dialogState.loading}
+					placeholder={`Type “${dialogState.options.input.confirmationText}” to confirm`}
+					aria-label={`Type “${dialogState.options.input.confirmationText}” to confirm`}
 					onkeydown={(event) => {
 						if (event.key === "Enter") {
 							event.preventDefault();
-							dialogState.confirm();
+							void dialogState.confirm();
 						}
 					}}
 				/>
+			{/if}
+			{#if dialogState.errorMessage}
+				<p class="text-sm text-destructive" role="alert">{dialogState.errorMessage}</p>
 			{/if}
 			<AlertDialog.Footer>
 				<AlertDialog.Cancel type="button" onclick={dialogState.cancel}>
@@ -42,9 +47,9 @@
 					type="submit"
 					variant="destructive"
 					loading={dialogState.loading}
-					disabled={dialogState.options?.input &&
-						dialogState.inputText !==
-							dialogState.options.input.confirmationText}
+					disabled={dialogState.loading ||
+						(dialogState.options?.input &&
+							dialogState.inputText !== dialogState.options.input.confirmationText)}
 				>
 					{dialogState.options?.confirm?.text ?? "Delete"}
 				</AlertDialog.Action>

@@ -1,7 +1,6 @@
 export type ConfirmDeleteOptions = {
 	title: string;
 	description: string;
-	skipConfirmation?: boolean;
 	input?: {
 		confirmationText: string;
 	};
@@ -20,6 +19,7 @@ class ConfirmDeleteDialogState {
 	inputText = $state('');
 	options = $state<ConfirmDeleteOptions | null>(null);
 	loading = $state(false);
+	errorMessage = $state<string | null>(null);
 
 	constructor() {
 		this.confirm = this.confirm.bind(this);
@@ -29,31 +29,35 @@ class ConfirmDeleteDialogState {
 	newConfirmation(options: ConfirmDeleteOptions) {
 		this.open = true;
 		this.inputText = '';
+		this.errorMessage = null;
 		this.options = options;
 	}
 
-	confirm() {
+	async confirm() {
 		if (
 			!this.options ||
+			this.loading ||
 			(this.options.input && this.inputText !== this.options.input.confirmationText)
 		) {
 			return;
 		}
 
 		this.loading = true;
-		void this.options
-			.onConfirm()
-			.then(() => {
-				this.open = false;
-			})
-			.catch(() => undefined)
-			.finally(() => {
-				this.loading = false;
-			});
+		this.errorMessage = null;
+		try {
+			await this.options.onConfirm();
+			this.open = false;
+		} catch (error) {
+			this.errorMessage =
+				error instanceof Error ? error.message : 'Unable to complete this action.';
+		} finally {
+			this.loading = false;
+		}
 	}
 
 	cancel() {
 		this.options?.onCancel?.();
+		this.errorMessage = null;
 		this.open = false;
 	}
 }
@@ -61,10 +65,5 @@ class ConfirmDeleteDialogState {
 export const dialogState = new ConfirmDeleteDialogState();
 
 export function confirmDelete(options: ConfirmDeleteOptions) {
-	if (options.skipConfirmation) {
-		void options.onConfirm();
-		return;
-	}
-
 	dialogState.newConfirmation(options);
 }

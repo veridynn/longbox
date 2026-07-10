@@ -7,7 +7,7 @@
 	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
-	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
+	import * as Rename from '$lib/components/ui/rename';
 	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
 	import {
 		IssueListView,
@@ -23,7 +23,8 @@
 		isDuplicateListItemError,
 		listHasCollectionItem,
 		listHasSearchIssue,
-		stableUserIssueKey
+		stableUserIssueKey,
+		validateListName
 	} from '$lib/features/lists/lists';
 	import {
 		IssueSort,
@@ -137,7 +138,7 @@
 	let isDeletingList = $state(false);
 	let listActionError = $state<string | null>(null);
 	let syncedSortSignature = $state('');
-	let pageTitle = $state<InlineListTitle | null>(null);
+	let renameMode = $state<'edit' | 'view'>('view');
 	let removingItemIds = $state<string[]>([]);
 	let shortcutModifier = $state('⌘');
 
@@ -187,7 +188,7 @@
 
 	function renameCurrentList() {
 		listMenuOpen = false;
-		void pageTitle?.startEditing();
+		renameMode = 'edit';
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -334,14 +335,21 @@
 
 	async function renameList(name: string) {
 		const list = currentList;
-		if (!list) return;
+		if (!list) return false;
+		listActionError = null;
 
-		await db.transact(
-			db.tx.userLists[list.id].update({
-				name,
-				updatedAt: new Date()
-			})
-		);
+		try {
+			await db.transact(
+				db.tx.userLists[list.id].update({
+					name: name.trim(),
+					updatedAt: new Date()
+				})
+			);
+			return true;
+		} catch (error) {
+			listActionError = error instanceof Error ? error.message : 'Unable to rename this list.';
+			return false;
+		}
 	}
 
 	async function updateListSortKey(listId: string, sortKey: IssueSortKey) {
@@ -379,6 +387,7 @@
 			await goto('/');
 		} catch (error) {
 			listActionError = error instanceof Error ? error.message : 'Unable to delete this list.';
+			throw error;
 		} finally {
 			isDeletingList = false;
 		}
@@ -391,8 +400,9 @@
 		listMenuOpen = false;
 		listActionError = null;
 		confirmDelete({
-			title: 'Delete',
-			description: `Are you sure you want to delete ${list.name}?`,
+			title: 'Delete list',
+			description:
+				'This action cannot be undone. Your list will be deleted, but its issues will remain in your collection.',
 			input: { confirmationText: list.name },
 			onConfirm: deleteList
 		});
@@ -408,6 +418,7 @@
 			await db.transact(db.tx.userListItems[itemId].delete());
 		} catch (error) {
 			listActionError = error instanceof Error ? error.message : 'Unable to remove this issue.';
+			throw error;
 		} finally {
 			removingItemIds = removingItemIds.filter((idValue) => idValue !== itemId);
 		}
@@ -491,7 +502,7 @@
 <main class="min-h-screen bg-background text-foreground">
 	<section class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
 		<header class="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
-			<div>
+			<div class="min-w-0">
 				<a
 					class="inline-flex items-center gap-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
 					href="/"
@@ -499,20 +510,48 @@
 					<ArrowLeft class="size-4" />
 					Collection
 				</a>
-				<h1 class="mt-3">
-					{#if currentList}
-						<InlineListTitle
-							bind:this={pageTitle}
-							class="text-2xl font-semibold tracking-normal"
-							existingNames={existingListNames}
-							isSubmitting={isDeletingList}
-							name={currentList.name}
-							onRename={renameList}
-						/>
-					{:else}
-						<span class="text-2xl font-semibold tracking-normal">List</span>
+				<div class="mt-3 flex min-w-0 items-center gap-1">
+					<h1 class="min-w-0">
+						{#if currentList}
+							<Rename.Root
+								this="span"
+								bind:mode={renameMode}
+								value={currentList.name}
+								validate={(name) => !validateListName(name.trim(), existingListNames, currentList.name)}
+								class="w-auto max-w-full text-2xl font-semibold tracking-normal"
+								inputClass="h-9 px-2"
+								textClass="truncate"
+								onSave={renameList}
+							/>
+						{:else}
+							<span class="text-2xl font-semibold tracking-normal">List</span>
+						{/if}
+					</h1>
+
+					{#if auth.user && currentList}
+						<Popover.Root bind:open={listMenuOpen}>
+							<Popover.Trigger aria-label="Open list actions" size="icon-sm" variant="ghost">
+								<EllipsisVertical />
+							</Popover.Trigger>
+							<Popover.Content class="w-max p-1.5" align="start">
+								<Button class="w-full justify-start" onclick={renameCurrentList} variant="ghost">
+									<Pencil data-icon="inline-start" />
+									Rename list
+								</Button>
+								<Button
+									aria-label="Delete list"
+									class="w-full justify-start"
+									disabled={isDeletingList}
+									onclick={confirmListDeletion}
+									variant="destructive"
+								>
+									<Trash2 data-icon="inline-start" />
+									Delete list
+								</Button>
+							</Popover.Content>
+						</Popover.Root>
 					{/if}
-				</h1>
+				</div>
 				<p class="mt-1 text-sm text-muted-foreground">{listItems.length} issues</p>
 				{#if allListsQuery.error}
 					<p class="mt-2 text-sm text-destructive">{allListsQuery.error.message}</p>
@@ -520,13 +559,9 @@
 			</div>
 
 			{#if auth.user && currentList}
-				<div class="flex flex-wrap gap-2">
-					<button
-						type="button"
-						class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-						onclick={openSearch}
-					>
-						<Plus class="size-4" />
+				<div>
+					<Button onclick={openSearch} size="lg">
+						<Plus data-icon="inline-start" />
 						Add issues
 						<span class="ml-1 hidden items-center gap-1 text-xs text-primary-foreground/70 sm:flex">
 							<kbd class="inline-flex h-5 min-w-5 items-center justify-center rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1.5 font-mono text-[10px] font-medium">
@@ -536,36 +571,7 @@
 								K
 							</kbd>
 						</span>
-					</button>
-					<Popover.Root bind:open={listMenuOpen}>
-						<Popover.Trigger
-							type="button"
-							class="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-							aria-label="Open list actions"
-						>
-							<EllipsisVertical class="size-4" />
-						</Popover.Trigger>
-						<Popover.Content class="w-max p-1.5" align="end">
-							<button
-								type="button"
-								class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium hover:bg-muted"
-								onclick={renameCurrentList}
-							>
-								<Pencil class="size-4" />
-								Rename list
-							</button>
-							<Button
-								aria-label="Delete list"
-								class="w-full justify-start"
-								disabled={isDeletingList}
-								onclick={confirmListDeletion}
-								variant="destructive"
-							>
-								<Trash2 data-icon="inline-start" />
-								Delete list
-							</Button>
-						</Popover.Content>
-					</Popover.Root>
+					</Button>
 				</div>
 			{/if}
 		</header>
@@ -630,7 +636,7 @@
 				sortKey={listSortKey}
 				viewMode={listViewMode}
 				onRemoveListItem={removeListItem}
-				removeDescription={`Are you sure you want to remove this issue from ${currentList.name}?`}
+				removeFromList
 				onReorderItems={reorderListItems}
 				onSortKeyChange={changeListSortKey}
 				onUpdateUserIssue={updateUserIssue}

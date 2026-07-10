@@ -45,10 +45,14 @@ describe('CollectionPanel', () => {
 		await expect.element(page.getByRole('link', { name: '#1' })).toBeInTheDocument();
 		await expect.element(page.getByText('Saga')).toBeInTheDocument();
 		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
-		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
+		await page.getByRole('button', { name: /Delete Saga #1/ }).click();
 		expect(onRemoveIssue).not.toHaveBeenCalled();
 		await expect
-			.element(page.getByText('Are you sure you want to remove this issue from your collection?'))
+			.element(
+				page.getByText(
+					'This action cannot be undone. The issue will be deleted from your collection and every list.'
+				)
+			)
 			.toBeInTheDocument();
 		expect(page.getByRole('textbox', { name: 'Confirmation text' })).not.toBeInTheDocument();
 		(document.querySelector('[data-alert-dialog-action]') as HTMLButtonElement).click();

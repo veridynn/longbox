@@ -41,7 +41,6 @@
 		{isLoading}
 		{items}
 		onRemoveListItem={onRemoveIssue}
-		removeDescription="Are you sure you want to remove this issue from your collection?"
 		{sortKey}
 		{onSortKeyChange}
 		{onUpdateUserIssue}

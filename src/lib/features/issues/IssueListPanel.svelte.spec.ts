@@ -83,7 +83,7 @@ describe('IssueListPanel', () => {
 
 		await expect.element(page.getByRole('link', { name: /Saga #1/ })).toBeInTheDocument();
 		await expect.element(page.getByText('Image · Jan 2024')).toBeInTheDocument();
-		expect(page.getByRole('button', { name: /Remove Saga #1/ })).not.toBeInTheDocument();
+		expect(page.getByRole('button', { name: /Delete Saga #1/ })).not.toBeInTheDocument();
 	});
 
 	it('switches to list mode through the view callback', async () => {
@@ -101,7 +101,7 @@ describe('IssueListPanel', () => {
 		const { unmount } = renderPanel({
 			onRemoveListItem,
 			onReorderItems: vi.fn(),
-			removeDescription: 'Are you sure you want to remove this issue from Favorites?',
+			removeFromList: true,
 			sortKey: IssueSort.Custom,
 			userSortable: true,
 			viewMode: 'list'
@@ -111,7 +111,11 @@ describe('IssueListPanel', () => {
 		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
 		expect(onRemoveListItem).not.toHaveBeenCalled();
 		await expect
-			.element(page.getByText('Are you sure you want to remove this issue from Favorites?'))
+			.element(
+				page.getByText(
+					'This action cannot be undone. The issue will be removed from this list, but it will remain in your collection.'
+				)
+			)
 			.toBeInTheDocument();
 		expect(page.getByRole('textbox', { name: 'Confirmation text' })).not.toBeInTheDocument();
 		(document.querySelector('[data-alert-dialog-action]') as HTMLButtonElement).click();
@@ -134,7 +138,7 @@ describe('IssueListPanel', () => {
 		render(ConfirmDeleteDialog);
 		renderPanel({
 			onRemoveListItem,
-			removeDescription: 'Are you sure you want to remove this issue from Favorites?',
+			removeFromList: true,
 			sortKey: IssueSort.Custom,
 			viewMode: 'list'
 		});
@@ -144,9 +148,7 @@ describe('IssueListPanel', () => {
 			?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
 
 		expect(onRemoveListItem).toHaveBeenCalledWith('item-1');
-		expect(
-			page.getByText('Are you sure you want to remove this issue from Favorites?')
-		).not.toBeInTheDocument();
+		expect(page.getByRole('heading', { name: 'Remove from list' })).not.toBeInTheDocument();
 	});
 
 	it('renders dense list columns and list membership links', async () => {
