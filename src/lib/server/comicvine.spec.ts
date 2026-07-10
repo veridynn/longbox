@@ -8,6 +8,7 @@ vi.mock('$env/dynamic/private', () => ({
 
 import {
 	ComicVineError,
+	isDcComicVineVolume,
 	normalizeIssueDetail,
 	normalizeSearchIssue,
 	normalizeVolumeDetail,
@@ -112,5 +113,53 @@ describe('ComicVine normalization', () => {
 		await expect(searchComicVineIssues('batman')).rejects.toThrow(
 			new ComicVineError('ComicVine returned an invalid response.')
 		);
+	});
+
+	it('recognizes the DC publisher family case-insensitively', () => {
+		for (const name of ['DC Comics', 'Vertigo', 'WildStorm', 'DC Black Label', 'Milestone Media']) {
+			expect(isDcComicVineVolume({ publisher: { id: 1, name } } as never)).toBe(true);
+		}
+
+		for (const name of ['Image Comics', 'Marvel', 'Unknown Publisher']) {
+			expect(isDcComicVineVolume({ publisher: { id: 1, name } } as never)).toBe(false);
+		}
+		expect(isDcComicVineVolume(null)).toBe(false);
+	});
+
+	it('over-fetches DC-family results and reuses volume lookups', async () => {
+		const responses = [
+			{
+				status_code: 1,
+				results: [
+					{ id: 1, issue_number: '1', volume: { id: 20, name: 'Spawn' } },
+					{ id: 2, issue_number: '1', volume: { id: 10, name: 'Batman' } },
+					{ id: 3, issue_number: '2', volume: { id: 10, name: 'Batman' } },
+					{ id: 4, issue_number: '1', volume: { id: 30, name: 'The Sandman Universe' } }
+				]
+			},
+			{ status_code: 1, results: { id: 20, name: 'Spawn', publisher: { id: 31, name: 'Image' } } },
+			{
+				status_code: 1,
+				results: { id: 10, name: 'Batman', publisher: { id: 10, name: 'DC Comics' } }
+			},
+			{
+				status_code: 1,
+				results: { id: 30, name: 'The Sandman Universe', publisher: { id: 1, name: 'Vertigo' } }
+			}
+		];
+		const fetchMock = vi
+			.fn()
+			.mockImplementation(() =>
+				Promise.resolve({ ok: true, json: () => Promise.resolve(responses.shift()) })
+			);
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(searchComicVineIssues('batman')).resolves.toMatchObject([
+			{ id: 2 },
+			{ id: 3 },
+			{ id: 4 }
+		]);
+		expect(fetchMock).toHaveBeenCalledTimes(4);
+		expect(fetchMock.mock.calls[0]?.[0].searchParams.get('limit')).toBe('50');
 	});
 });

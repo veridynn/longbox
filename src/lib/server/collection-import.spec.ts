@@ -3,7 +3,8 @@ import { getComicVineIssue, getComicVineVolume } from '$lib/server/comicvine';
 import { getAdminDb } from '$lib/server/instant-admin';
 import { importComicVineIssue } from './collection-import';
 
-vi.mock('$lib/server/comicvine', () => ({
+vi.mock('$lib/server/comicvine', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/comicvine')>()),
 	getComicVineIssue: vi.fn(),
 	getComicVineVolume: vi.fn()
 }));
@@ -86,7 +87,7 @@ const comicVineVolume = {
 	summary: null,
 	issueCount: 1,
 	coverImageUrl: null,
-	publisher: { id: 10, name: 'A Publisher' },
+	publisher: { id: 10, name: 'DC Comics' },
 	raw: { id: 456 }
 };
 
@@ -197,5 +198,20 @@ describe('importComicVineIssue', () => {
 			updatedAt: expect.any(Date)
 		});
 		expect(db.transact).toHaveBeenCalledOnce();
+	});
+
+	it('rejects non-DC Comics issues before writing', async () => {
+		const { db } = createAdminDb(() => ({ userIssues: [] }));
+		vi.mocked(getAdminDb).mockReturnValue(db as never);
+		vi.mocked(getComicVineIssue).mockResolvedValue(comicVineIssue);
+		vi.mocked(getComicVineVolume).mockResolvedValue({
+			...comicVineVolume,
+			publisher: { id: 31, name: 'Image Comics' }
+		});
+
+		await expect(importComicVineIssue('user-1', 123)).rejects.toThrow(
+			'Only DC Comics issues can be imported.'
+		);
+		expect(db.transact).not.toHaveBeenCalled();
 	});
 });

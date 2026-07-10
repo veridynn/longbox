@@ -1,6 +1,22 @@
 import { env } from '$env/dynamic/private';
 
 const COMIC_VINE_BASE_URL = 'https://comicvine.gamespot.com/api';
+const DC_PUBLISHERS = new Set([
+	'all-american publications',
+	'black label',
+	'dc black label',
+	'dc comics',
+	'dc comics - vertigo',
+	'dc comics/wildstorm',
+	'dc young animal',
+	'elseworlds',
+	'milestone media',
+	'national comics publications',
+	'national periodical publications',
+	'vertigo',
+	'wildstorm',
+	'young animal'
+]);
 
 type ComicVineImage = {
 	icon_url?: string | null;
@@ -292,13 +308,34 @@ export async function searchComicVineIssues(query: string, limit = 12) {
 	const results = await comicVineGet<ComicVineRecord[]>('/search/', {
 		query,
 		resources: 'issue',
-		limit,
+		limit: Math.min(Math.max(limit * 4, 50), 100),
 		field_list: 'id,name,issue_number,cover_date,image,volume,api_detail_url,site_detail_url'
 	});
 
-	return results
+	const issues = results
 		.map(normalizeSearchIssue)
 		.filter((issue): issue is ComicVineSearchIssue => Boolean(issue));
+	const dcVolumes = new Map<number, boolean>();
+	const dcIssues: ComicVineSearchIssue[] = [];
+
+	for (const issue of issues) {
+		const volumeId = issue.volume.id;
+		if (!volumeId) continue;
+
+		if (!dcVolumes.has(volumeId)) {
+			const volume = await getComicVineVolume(volumeId);
+			dcVolumes.set(volumeId, isDcComicVineVolume(volume));
+		}
+
+		if (dcVolumes.get(volumeId)) dcIssues.push(issue);
+		if (dcIssues.length === limit) break;
+	}
+
+	return dcIssues;
+}
+
+export function isDcComicVineVolume(volume: ComicVineVolumeDetail | null) {
+	return DC_PUBLISHERS.has(volume?.publisher?.name.toLowerCase() ?? '');
 }
 
 export async function getComicVineIssue(issueId: number) {

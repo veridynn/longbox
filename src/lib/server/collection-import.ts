@@ -1,8 +1,10 @@
 import { lookup } from '@instantdb/admin';
 import { getAdminDb } from '$lib/server/instant-admin';
 import {
+	ComicVineError,
 	getComicVineIssue,
 	getComicVineVolume,
+	isDcComicVineVolume,
 	type ComicVineIssueDetail
 } from '$lib/server/comicvine';
 import { COLLECTION_NAME } from '$lib/collection';
@@ -141,6 +143,9 @@ export async function importComicVineIssue(
 
 	const issue = await getComicVineIssue(issueComicVineId);
 	const volume = issue.volume.id ? await getComicVineVolume(issue.volume.id) : null;
+	if (!isDcComicVineVolume(volume)) {
+		throw new ComicVineError('Only DC Comics issues can be imported.', 400);
+	}
 	const now = new Date();
 
 	const publisher = volume?.publisher;
