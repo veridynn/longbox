@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
 import IssueListPanel from './IssueListPanel.svelte';
 import { IssueSort } from './sort';
+import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
 
 const items = [
 	{
@@ -96,9 +97,11 @@ describe('IssueListPanel', () => {
 
 	it('shows remove and drag controls only when custom sorting is enabled', async () => {
 		const onRemoveListItem = vi.fn();
+		render(ConfirmDeleteDialog);
 		const { unmount } = renderPanel({
 			onRemoveListItem,
 			onReorderItems: vi.fn(),
+			removeDescription: 'Are you sure you want to remove this issue from Favorites?',
 			sortKey: IssueSort.Custom,
 			userSortable: true,
 			viewMode: 'list'
@@ -106,6 +109,12 @@ describe('IssueListPanel', () => {
 
 		await expect.element(page.getByRole('button', { name: /Drag Saga #1/ })).toBeInTheDocument();
 		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
+		expect(onRemoveListItem).not.toHaveBeenCalled();
+		await expect
+			.element(page.getByText('Are you sure you want to remove this issue from Favorites?'))
+			.toBeInTheDocument();
+		expect(page.getByRole('textbox', { name: 'Confirmation text' })).not.toBeInTheDocument();
+		(document.querySelector('[data-alert-dialog-action]') as HTMLButtonElement).click();
 
 		expect(onRemoveListItem).toHaveBeenCalledWith('item-1');
 		await unmount();
@@ -118,6 +127,26 @@ describe('IssueListPanel', () => {
 		});
 
 		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
+	});
+
+	it('skips remove confirmation on shift-click', async () => {
+		const onRemoveListItem = vi.fn();
+		render(ConfirmDeleteDialog);
+		renderPanel({
+			onRemoveListItem,
+			removeDescription: 'Are you sure you want to remove this issue from Favorites?',
+			sortKey: IssueSort.Custom,
+			viewMode: 'list'
+		});
+
+		document
+			.querySelector('[aria-label="Remove Saga #1: First"]')
+			?.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+
+		expect(onRemoveListItem).toHaveBeenCalledWith('item-1');
+		expect(
+			page.getByText('Are you sure you want to remove this issue from Favorites?')
+		).not.toBeInTheDocument();
 	});
 
 	it('renders dense list columns and list membership links', async () => {

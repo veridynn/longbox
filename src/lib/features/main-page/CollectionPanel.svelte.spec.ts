@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
 import CollectionPanel from './CollectionPanel.svelte';
 import { IssueSort } from '$lib/features/issues/sort';
+import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
 
 const items = [
 	{
@@ -25,6 +26,7 @@ const items = [
 describe('CollectionPanel', () => {
 	it('renders the shared issue view without list-management controls', async () => {
 		const onRemoveIssue = vi.fn();
+		render(ConfirmDeleteDialog);
 		render(CollectionPanel, {
 			errorMessage: null,
 			isLoading: false,
@@ -44,6 +46,12 @@ describe('CollectionPanel', () => {
 		await expect.element(page.getByText('Saga')).toBeInTheDocument();
 		expect(page.getByRole('button', { name: /Drag Saga #1/ })).not.toBeInTheDocument();
 		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
+		expect(onRemoveIssue).not.toHaveBeenCalled();
+		await expect
+			.element(page.getByText('Are you sure you want to remove this issue from your collection?'))
+			.toBeInTheDocument();
+		expect(page.getByRole('textbox', { name: 'Confirmation text' })).not.toBeInTheDocument();
+		(document.querySelector('[data-alert-dialog-action]') as HTMLButtonElement).click();
 		expect(onRemoveIssue).toHaveBeenCalledWith('item-1');
 	});
 

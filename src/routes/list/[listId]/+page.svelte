@@ -5,7 +5,8 @@
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
-	import DeleteListDialog from '$lib/features/lists/DeleteListDialog.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
 	import InlineListTitle from '$lib/features/lists/InlineListTitle.svelte';
 	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
 	import {
@@ -45,8 +46,8 @@
 	let { params }: PageProps = $props();
 	const listSearchParams = useSearchParams(
 		createSearchParamsSchema({
-			sort: { type: 'string', default: '' },
-			view: { type: 'string', default: '' }
+			view: { type: 'string', default: '' },
+			sort: { type: 'string', default: '' }
 		}),
 		{ pushHistory: false, noScroll: true }
 	);
@@ -132,8 +133,6 @@
 	let searchOpen = $state(false);
 	let addingIssueIds = $state<number[]>([]);
 	let addingUserIssueIds = $state<string[]>([]);
-	let deleteListError = $state<string | null>(null);
-	let deleteListOpen = $state(false);
 	let listMenuOpen = $state(false);
 	let isDeletingList = $state(false);
 	let listActionError = $state<string | null>(null);
@@ -360,19 +359,12 @@
 		}
 	}
 
-	function changeListSortKey(sortKey: IssueSortKey) {
-		listSearchParams.sort = sortKey;
-	}
-
 	function changeListViewMode(viewMode: IssueListViewMode) {
 		listSearchParams.view = viewMode;
 	}
 
-	function closeDeleteList() {
-		if (isDeletingList) return;
-
-		deleteListOpen = false;
-		deleteListError = null;
+	function changeListSortKey(sortKey: IssueSortKey) {
+		listSearchParams.sort = sortKey;
 	}
 
 	async function deleteList() {
@@ -380,16 +372,30 @@
 		if (!list || isDeletingList) return;
 
 		isDeletingList = true;
-		deleteListError = null;
+		listActionError = null;
 
 		try {
 			await db.transact(db.tx.userLists[list.id].delete());
 			await goto('/');
 		} catch (error) {
-			deleteListError = error instanceof Error ? error.message : 'Unable to delete this list.';
+			listActionError = error instanceof Error ? error.message : 'Unable to delete this list.';
 		} finally {
 			isDeletingList = false;
 		}
+	}
+
+	function confirmListDeletion() {
+		const list = currentList;
+		if (!list) return;
+
+		listMenuOpen = false;
+		listActionError = null;
+		confirmDelete({
+			title: 'Delete',
+			description: `Are you sure you want to delete ${list.name}?`,
+			input: { confirmationText: list.name },
+			onConfirm: deleteList
+		});
 	}
 
 	async function removeListItem(itemId: string) {
@@ -458,20 +464,20 @@
 	$effect(() => {
 		const list = currentList;
 		if (!list) return;
-		const sortKey = listSearchParams.sort;
 		const viewMode = listSearchParams.view;
+		const sortKey = listSearchParams.sort;
 		const savedViewMode = storedIssueListViewMode(listViewStorageKey(list.id));
-
-		if (!sortKey && isAllowedIssueSortKey(list.sortKey, true)) {
-			listSearchParams.sort = list.sortKey;
-		} else if (isAllowedIssueSortKey(sortKey, true)) {
-			persistListSortKey(list, sortKey);
-		}
 
 		if (!viewMode && savedViewMode) {
 			listSearchParams.view = savedViewMode;
 		} else if (isIssueListViewMode(viewMode)) {
 			saveIssueListViewMode(listViewStorageKey(list.id), viewMode);
+		}
+
+		if (!sortKey && isAllowedIssueSortKey(list.sortKey, true)) {
+			listSearchParams.sort = list.sortKey;
+		} else if (isAllowedIssueSortKey(sortKey, true)) {
+			persistListSortKey(list, sortKey);
 		}
 	});
 </script>
@@ -548,18 +554,16 @@
 								<Pencil class="size-4" />
 								Rename list
 							</button>
-							<button
-								type="button"
-								class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
-								onclick={() => {
-									listMenuOpen = false;
-									deleteListError = null;
-									deleteListOpen = true;
-								}}
+							<Button
+								aria-label="Delete list"
+								class="w-full justify-start"
+								disabled={isDeletingList}
+								onclick={confirmListDeletion}
+								variant="destructive"
 							>
-								<Trash2 class="size-4" />
+								<Trash2 data-icon="inline-start" />
 								Delete list
-							</button>
+							</Button>
 						</Popover.Content>
 					</Popover.Root>
 				</div>
@@ -626,6 +630,7 @@
 				sortKey={listSortKey}
 				viewMode={listViewMode}
 				onRemoveListItem={removeListItem}
+				removeDescription={`Are you sure you want to remove this issue from ${currentList.name}?`}
 				onReorderItems={reorderListItems}
 				onSortKeyChange={changeListSortKey}
 				onUpdateUserIssue={updateUserIssue}
@@ -654,14 +659,3 @@
 		{/if}
 	</section>
 </main>
-
-{#if currentList}
-	<DeleteListDialog
-		errorMessage={deleteListError}
-		isSubmitting={isDeletingList}
-		listName={currentList.name}
-		bind:open={deleteListOpen}
-		onCancel={closeDeleteList}
-		onConfirm={deleteList}
-	/>
-{/if}

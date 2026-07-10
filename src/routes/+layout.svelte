@@ -9,6 +9,7 @@
 		issueTransitionDirection,
 		markIssueTransitionIncoming
 	} from '$lib/comics/view-transitions.svelte.ts';
+	import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
 
 	let { children } = $props();
 	let activeViewTransition: ViewTransition | null = null;
@@ -68,3 +69,4 @@
 	<meta name="theme-color" content="#151716" />
 </svelte:head>
 {@render children()}
+<ConfirmDeleteDialog />

@@ -23,7 +23,10 @@
 	import { flushSync } from 'svelte';
 	import { formatDate } from '$lib/comics/format';
 	import type { CollectionIssue, CollectionItem, UserIssuePatch } from '$lib/comics/types';
+	import { Button } from '$lib/components/ui/button';
+	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
 	import * as Popover from '$lib/components/ui/popover';
+	import { Spinner } from '$lib/components/ui/spinner';
 	import * as StarRating from '$lib/components/ui/star-rating';
 	import {
 		isActiveIssueTransition,
@@ -51,6 +54,7 @@
 		onSortKeyChange: (sortKey: IssueSortKey) => void | Promise<void>;
 		onUpdateUserIssue?: (userIssueId: string, patch: UserIssuePatch) => void | Promise<void>;
 		onViewModeChange: (viewMode: IssueListViewMode) => void;
+		removeDescription?: string;
 		removingItemIds?: string[];
 		sortKey: IssueSortKey;
 		userSortable?: boolean;
@@ -69,6 +73,7 @@
 		onSortKeyChange,
 		onUpdateUserIssue,
 		onViewModeChange,
+		removeDescription = 'Are you sure you want to remove this issue?',
 		removingItemIds = [],
 		sortKey,
 		userSortable = false,
@@ -203,6 +208,15 @@
 		if (nextSortKey !== activeSortKey) {
 			void onSortKeyChange(nextSortKey);
 		}
+	}
+
+	function confirmRemove(event: MouseEvent, itemId: string) {
+		confirmDelete({
+			title: 'Delete',
+			description: removeDescription,
+			skipConfirmation: event.shiftKey,
+			onConfirm: async () => onRemoveListItem?.(itemId)
+		});
 	}
 
 	function prepareIssueTransition(issue: CollectionIssue, listPosition?: number) {
@@ -462,19 +476,20 @@
 										<Heart class={`size-4 ${item.userIssue?.favorite ? 'fill-current' : ''}`} />
 									</button>
 									{#if onRemoveListItem}
-										<button
-											type="button"
-											class="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-70"
+										<Button
 											aria-label={`Remove ${issueTitle(item)}`}
+											class="cursor-pointer"
 											disabled={removingItemIds.includes(item.id)}
-											onclick={() => void onRemoveListItem(item.id)}
+											onclick={(event) => confirmRemove(event, item.id)}
+											size="icon"
+											variant="destructive"
 										>
 											{#if removingItemIds.includes(item.id)}
-												<LoaderCircle class="size-4 animate-spin" />
+												<Spinner />
 											{:else}
-												<Trash2 class="size-4" />
+												<Trash2 />
 											{/if}
-										</button>
+										</Button>
 									{/if}
 								</div>
 							</div>
