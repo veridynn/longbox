@@ -2,6 +2,7 @@ import { createRawSnippet } from 'svelte';
 import { page } from 'vite-plus/test/browser';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
+import '../../../routes/layout.css';
 import IssueListPanel from './IssueListPanel.svelte';
 import { IssueSort } from './sort';
 import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
@@ -108,6 +109,14 @@ describe('IssueListPanel', () => {
 		});
 
 		await expect.element(page.getByRole('button', { name: /Drag Saga #1/ })).toBeInTheDocument();
+		expect(document.querySelector('[data-list-handle-cell]')).toHaveClass(
+			'sticky',
+			'left-0',
+			'z-20'
+		);
+		expect(document.querySelector<HTMLElement>('[data-list-number-cell]')?.style.left).toBe(
+			'2.25rem'
+		);
 		await page.getByRole('button', { name: /Remove Saga #1/ }).click();
 		expect(onRemoveListItem).not.toHaveBeenCalled();
 		await expect
@@ -167,6 +176,44 @@ describe('IssueListPanel', () => {
 		expect(page.getByText('Characters')).not.toBeInTheDocument();
 		expect(page.getByText('Acquired')).not.toBeInTheDocument();
 		expect(page.getByRole('link', { name: 'Current list' })).not.toBeInTheDocument();
+	});
+
+	it('sizes list columns intrinsically and pins essential cells during overflow', async () => {
+		renderPanel({
+			onRemoveListItem: vi.fn(),
+			viewMode: 'list'
+		});
+
+		const grid = document.querySelector<HTMLElement>('[data-list-grid]');
+		const numberCell = document.querySelector<HTMLElement>('[data-list-number-cell]');
+		const actionsCell = document.querySelector<HTMLElement>('[data-list-actions-cell]');
+		const scrollContainer = grid?.parentElement;
+
+		expect(grid?.style.gridTemplateColumns).toBe(
+			'max-content max-content max-content max-content minmax(1rem, 1fr) max-content max-content'
+		);
+		expect(numberCell).toHaveClass('sticky', 'bg-background');
+		expect(numberCell?.style.left).toBe('0px');
+		expect(actionsCell).toHaveClass('sticky', 'right-0', 'bg-background');
+		expect(scrollContainer).not.toBeNull();
+
+		if (!grid || !numberCell || !actionsCell || !scrollContainer) return;
+
+		for (const width of [320, 768, 1280]) {
+			scrollContainer.style.width = `${width}px`;
+			await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+			expect(scrollContainer.clientWidth).toBe(width);
+			expect(grid.clientWidth).toBeGreaterThanOrEqual(width);
+		}
+
+		scrollContainer.style.width = '160px';
+		scrollContainer.scrollLeft = scrollContainer.scrollWidth;
+		await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+		const scrollBounds = scrollContainer.getBoundingClientRect();
+		expect(scrollContainer.scrollWidth).toBeGreaterThan(scrollContainer.clientWidth);
+		expect(numberCell.getBoundingClientRect().left).toBeCloseTo(scrollBounds.left, 0);
+		expect(actionsCell.getBoundingClientRect().right).toBeCloseTo(scrollBounds.right, 0);
 	});
 
 	it('updates status icons and rating inline', async () => {

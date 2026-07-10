@@ -100,9 +100,9 @@
 		[
 			canReorder ? '2.25rem' : null,
 			'max-content',
-			'minmax(10rem, max-content)',
-			'minmax(8rem, max-content)',
-			'minmax(7rem, max-content)',
+			'max-content',
+			'max-content',
+			'max-content',
 			'minmax(1rem, 1fr)',
 			'max-content',
 			'max-content'
@@ -236,7 +236,7 @@
 	<Icon class="size-4 text-muted-foreground" aria-hidden="true" />
 {/snippet}
 
-<section>
+<section class="min-w-0" data-issue-list-panel>
 	<div class="flex items-center justify-between border-b border-border px-4 py-3">
 		<div class="flex items-center gap-2">
 			<div class="relative grid grid-cols-2 rounded-lg bg-muted p-1" aria-label="View mode">
@@ -356,7 +356,11 @@
 		</ul>
 	{:else}
 		<div class="overflow-x-auto">
-			<ul class="inline-grid min-w-full text-sm" style:grid-template-columns={listGridTemplate}>
+			<ul
+				class="inline-grid w-max min-w-full text-sm"
+				style:grid-template-columns={listGridTemplate}
+				data-list-grid
+			>
 				{#each sortedItems as item, index (item.id)}
 					{@const issue = item.userIssue?.issue}
 					{#if issue}
@@ -379,7 +383,10 @@
 							class="group col-span-full grid grid-cols-subgrid items-center border-b border-border bg-background transition"
 						>
 							{#if canReorder}
-								<div class="px-2 py-2">
+								<div
+									class="sticky left-0 z-20 bg-background px-2 py-2"
+									data-list-handle-cell
+								>
 									<button
 										type="button"
 										class="inline-flex size-8 touch-none cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing"
@@ -390,7 +397,11 @@
 									</button>
 								</div>
 							{/if}
-							<div class="px-3 py-2 font-medium whitespace-nowrap">
+							<div
+								class="sticky z-10 border-r border-border bg-background px-3 py-2 font-medium whitespace-nowrap"
+								style:left={canReorder ? '2.25rem' : '0px'}
+								data-list-number-cell
+							>
 								<a
 									class="underline-offset-4 hover:underline"
 									href={`/issues/${issue.id}`}
@@ -437,7 +448,10 @@
 									{/snippet}
 								</StarRating.Root>
 							</div>
-							<div class="px-2 py-2">
+							<div
+								class="sticky right-0 z-10 border-l border-border bg-background px-2 py-2"
+								data-list-actions-cell
+							>
 								<div class="flex items-center gap-0.5">
 									<button
 										type="button"

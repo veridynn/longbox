@@ -1,6 +1,7 @@
 import { page } from 'vite-plus/test/browser';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
+import '../../../routes/layout.css';
 import ListsPanel from './ListsPanel.svelte';
 
 function pressInputKey(key: string) {
@@ -10,7 +11,7 @@ function pressInputKey(key: string) {
 }
 
 describe('ListsPanel', () => {
-	it('renders custom lists in order with issue counts', async () => {
+	it('renders custom lists as a compact horizontal scroller', async () => {
 		render(ListsPanel, {
 			customLists: [
 				{
@@ -42,15 +43,31 @@ describe('ListsPanel', () => {
 
 		expect(document.body.textContent).toContain('To read');
 		expect(document.body.textContent).toContain('Indie picks');
-		expect(document.body.textContent).toContain('1 issue');
+		expect(document.body.textContent).not.toContain('1 issue');
+		expect(document.body.textContent).not.toContain('0 issues');
 		await expect
-			.element(page.getByRole('link', { name: '1 issue' }))
+			.element(page.getByRole('link', { name: 'Open To read' }))
 			.toHaveAttribute('href', '/list/one');
 		await expect
-			.element(page.getByRole('link', { name: '0 issues' }))
+			.element(page.getByRole('link', { name: 'Open Indie picks' }))
 			.toHaveAttribute('href', '/list/two');
 		expect(document.querySelectorAll('a[href="/list/one"] img')).toHaveLength(5);
 		expect(document.querySelectorAll('a[href="/list/two"] [aria-hidden="true"]')).toHaveLength(5);
+
+		const carousel = document.querySelector<HTMLElement>('[data-list-carousel]');
+		const cards = document.querySelectorAll<HTMLElement>('[data-list-card]');
+		expect(carousel).toHaveClass('flex-nowrap', 'overflow-x-auto');
+		expect(carousel).not.toHaveClass('snap-x', 'snap-mandatory');
+		expect(cards).toHaveLength(2);
+		expect(cards[0]).toHaveClass('w-40', 'shrink-0');
+		expect(cards[0]).not.toHaveClass('snap-center');
+
+		if (carousel) {
+			carousel.style.width = '320px';
+			await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+			expect(carousel.scrollWidth).toBeGreaterThan(carousel.clientWidth);
+		}
+
 		expect(page.getByLabelText('View mode')).not.toBeInTheDocument();
 		expect(page.getByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
 	});

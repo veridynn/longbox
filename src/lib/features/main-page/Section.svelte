@@ -11,7 +11,7 @@
 	const headingId = $derived(`${title.toLowerCase().replaceAll(' ', '-')}-heading`);
 </script>
 
-<section aria-labelledby={headingId} class="grid gap-3">
+<section aria-labelledby={headingId} class="grid min-w-0 gap-3">
 	<div class="flex items-center justify-between gap-3">
 		<h2 id={headingId} class="font-semibold">{title}</h2>
 		{#if actions}

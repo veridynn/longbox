@@ -1,6 +1,7 @@
 import { page } from 'vite-plus/test/browser';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { render } from 'vitest-browser-svelte';
+import '../../../routes/layout.css';
 import CollectionPanel from './CollectionPanel.svelte';
 import { IssueSort } from '$lib/features/issues/sort';
 import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
@@ -79,5 +80,45 @@ describe('CollectionPanel', () => {
 		await page.getByRole('button', { name: 'Add first issue' }).click();
 
 		expect(onAddIssue).toHaveBeenCalledOnce();
+	});
+
+	it('contains list overflow within the main-page section', async () => {
+		const responsiveItems = [
+			{
+				...items[0],
+				userIssue: {
+					...items[0].userIssue,
+					issue: {
+						...items[0].userIssue.issue,
+						name: 'A deliberately long issue title for responsive layout coverage',
+						volume: {
+							...items[0].userIssue.issue.volume,
+							name: 'A deliberately long volume name'
+						}
+					}
+				}
+			}
+		];
+		const { container } = render(CollectionPanel, {
+			errorMessage: null,
+			isLoading: false,
+			items: responsiveItems,
+			onAddIssue: vi.fn(),
+			onRemoveIssue: vi.fn(),
+			onSortKeyChange: vi.fn(),
+			onViewModeChange: vi.fn(),
+			sortKey: IssueSort.NewestAdded,
+			viewMode: 'list'
+		});
+		const grid = container.querySelector<HTMLElement>('[data-list-grid]');
+		const scroller = grid?.parentElement;
+
+		container.style.display = 'flex';
+		container.style.flexDirection = 'column';
+		container.style.width = '320px';
+		await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+		expect(container.scrollWidth).toBe(container.clientWidth);
+		expect(scroller?.scrollWidth).toBeGreaterThan(scroller?.clientWidth ?? 0);
 	});
 });

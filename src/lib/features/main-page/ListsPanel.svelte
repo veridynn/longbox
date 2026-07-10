@@ -29,10 +29,6 @@
 		}
 	});
 
-	function issueLabel(count: number) {
-		return `${count} ${count === 1 ? 'issue' : 'issues'}`;
-	}
-
 	function coverOpacity(index: number) {
 		return String(Math.max(0.28, 1 - index * 0.17));
 	}
@@ -74,7 +70,7 @@
 		</button>
 	{/snippet}
 
-	<div class="pb-1">
+	<div class="min-w-0 pb-1">
 		{#if isLoading}
 			<div class="flex items-center text-sm text-muted-foreground">
 				<LoaderCircle class="mr-2 size-4 animate-spin" />
@@ -85,46 +81,46 @@
 				{errorMessage}
 			</p>
 		{:else}
-			<div class="flex flex-wrap gap-3">
+			<div
+				class="flex min-w-0 w-full flex-nowrap gap-3 overflow-x-auto overscroll-x-contain pb-2"
+				data-list-carousel
+			>
 				{#each customLists as list (list.id)}
-					<div class="rounded-md border border-border bg-background px-3 py-2">
+					<div
+						class="w-40 shrink-0 rounded-md border border-border bg-background px-2.5 py-2"
+						data-list-card
+					>
 						<Rename.Root
 							this="span"
 							value={list.name}
-							class="font-medium"
+							class="block w-full truncate font-medium"
 							inputClass="h-8 px-2"
 							validate={(name) => !validateListName(name.trim(), existingListNames, list.name)}
 							onSave={(name) => onRenameList(list.id, name.trim())}
 						/>
 						<a
-							class="mt-1 block text-sm text-muted-foreground underline-offset-4 hover:underline"
-							href={`/list/${list.id}`}
-						>
-							{issueLabel(list.issueCount)}
-						</a>
-						<a
-							class="mt-3 block underline-offset-4 hover:underline"
+							class="mt-2 block underline-offset-4 hover:underline"
 							href={`/list/${list.id}`}
 							aria-label={`Open ${list.name}`}
 						>
-							<div class="relative h-52 w-56">
+							<div class="relative h-32 w-full">
 								{#each coverSlots(list.coverImageUrls) as coverImageUrl, index (index)}
 									{#if coverImageUrl}
 										<img
-											class="absolute h-36 w-24 border border-background object-cover shadow-md"
+											class="absolute h-24 w-16 border border-background object-cover shadow-md"
 											src={coverImageUrl}
 											alt=""
-											style:left={`${index * 8}px`}
-											style:bottom={`${index * 16}px`}
+											style:left={`${26 + index * 6}px`}
+											style:bottom={`${index * 8}px`}
 											style:z-index={5 - index}
 											style:opacity={coverOpacity(index)}
 										/>
 									{:else}
 										<div
 											aria-hidden="true"
-											class="absolute h-36 w-24 border border-background bg-muted shadow-md"
-											style:left={`${index * 8}px`}
-											style:bottom={`${index * 16}px`}
+											class="absolute h-24 w-16 border border-background bg-muted shadow-md"
+											style:left={`${26 + index * 6}px`}
+											style:bottom={`${index * 8}px`}
 											style:z-index={5 - index}
 											style:opacity={coverOpacity(index)}
 										></div>
