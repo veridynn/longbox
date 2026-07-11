@@ -232,7 +232,9 @@
 		isSearching = true;
 
 		try {
-			const response = await fetch(`/api/comicvine/search?q=${encodeURIComponent(trimmed)}`);
+			const response = await fetch(`/api/comicvine/search?q=${encodeURIComponent(trimmed)}`, {
+				cache: 'no-store'
+			});
 			const body = await readJsonResponse(response);
 
 			if (!response.ok) {

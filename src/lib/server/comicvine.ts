@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 
 const COMIC_VINE_BASE_URL = 'https://comicvine.gamespot.com/api';
+const DC_COMICS_PUBLISHER_ID = 10;
 const DC_PUBLISHERS = new Set([
 	'all-american publications',
 	'black label',
@@ -101,6 +102,19 @@ type ComicVineResponse<T> = {
 
 type ComicVineRecord = Record<string, unknown>;
 
+type ComicVineSearchVolume = {
+	id: number;
+	name: string;
+};
+
+const comicVineCache = ((
+	globalThis as typeof globalThis & {
+		__longboxComicVineCache?: {
+			dcVolumeIndexPromise?: Promise<ComicVineSearchVolume[]>;
+		};
+	}
+).__longboxComicVineCache ??= {});
+
 export class ComicVineError extends Error {
 	constructor(
 		message: string,
@@ -193,6 +207,10 @@ async function comicVineGet<T>(path: string, params: Record<string, string | num
 	});
 
 	if (!response.ok) {
+		if (response.status === 420) {
+			throw new ComicVineError('ComicVine is temporarily rate limiting requests.', 429);
+		}
+
 		throw new ComicVineError(`ComicVine request failed with ${response.status}.`, 502);
 	}
 
@@ -304,7 +322,89 @@ export function normalizeVolumeDetail(raw: ComicVineRecord): ComicVineVolumeDeta
 	};
 }
 
+function normalizeSearchVolume(raw: ComicVineRecord): ComicVineSearchVolume | null {
+	const id = numberId(raw.id);
+	const name = text(raw.name);
+
+	if (!id || !name) return null;
+	return { id, name };
+}
+
+async function getDcVolumeIndex() {
+	// ponytail: process-global cache; use a durable daily refresh if cold-start payload becomes costly.
+	comicVineCache.dcVolumeIndexPromise ??= comicVineGet<ComicVineRecord>(
+		`/publisher/4010-${DC_COMICS_PUBLISHER_ID}/`,
+		{ field_list: 'volumes' }
+	).then((publisher) =>
+		(Array.isArray(publisher.volumes) ? publisher.volumes : [])
+			.map(objectRecord)
+			.filter((volume): volume is ComicVineRecord => Boolean(volume))
+			.map(normalizeSearchVolume)
+			.filter((volume): volume is ComicVineSearchVolume => Boolean(volume))
+	);
+
+	try {
+		return await comicVineCache.dcVolumeIndexPromise;
+	} catch (error) {
+		comicVineCache.dcVolumeIndexPromise = undefined;
+		throw error;
+	}
+}
+
+export function resetComicVineCaches() {
+	comicVineCache.dcVolumeIndexPromise = undefined;
+}
+
+async function searchIssuesByPartialVolumeName(query: string, limit: number) {
+	const filterQuery = query.replace(/[,:|]/g, ' ').replace(/\s+/g, ' ').trim();
+	if (filterQuery.length < 2) return null;
+
+	const normalizedQuery = filterQuery.toLowerCase();
+	const volumesByName = new Map<string, ComicVineSearchVolume>();
+
+	for (const volume of await getDcVolumeIndex()) {
+		if (!volume.name.toLowerCase().includes(normalizedQuery)) continue;
+
+		const name = volume.name.toLowerCase();
+		const current = volumesByName.get(name);
+		if (!current || volume.id > current.id) volumesByName.set(name, volume);
+	}
+
+	const volumes = [...volumesByName.values()]
+		.sort((first, second) => {
+			const length = first.name.length - second.name.length;
+			const position =
+				first.name.toLowerCase().indexOf(normalizedQuery) -
+				second.name.toLowerCase().indexOf(normalizedQuery);
+			return length || position || first.name.localeCompare(second.name);
+		})
+		.slice(0, Math.min(3, limit));
+
+	if (!volumes.length) return null;
+
+	const issuesPerVolume = Math.ceil(limit / volumes.length);
+	const issues = await Promise.all(
+		volumes.map((volume) =>
+			comicVineGet<ComicVineRecord[]>('/issues/', {
+				filter: `volume:${volume.id}`,
+				sort: 'cover_date:desc',
+				limit: issuesPerVolume,
+				field_list: 'id,name,issue_number,cover_date,image,volume,api_detail_url,site_detail_url'
+			})
+		)
+	);
+
+	return issues
+		.flat()
+		.map(normalizeSearchIssue)
+		.filter((issue): issue is ComicVineSearchIssue => Boolean(issue))
+		.slice(0, limit);
+}
+
 export async function searchComicVineIssues(query: string, limit = 12) {
+	const volumeIssues = await searchIssuesByPartialVolumeName(query, limit);
+	if (volumeIssues !== null) return volumeIssues;
+
 	const results = await comicVineGet<ComicVineRecord[]>('/search/', {
 		query,
 		resources: 'issue',

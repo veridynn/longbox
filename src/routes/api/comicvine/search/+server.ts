@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	try {
 		const results = await searchComicVineIssues(query);
-		return json({ results });
+		return json({ results }, { headers: { 'cache-control': 'no-store' } });
 	} catch (error) {
 		if (error instanceof ComicVineError) {
 			return json({ error: error.message }, { status: error.status });

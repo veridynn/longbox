@@ -42,6 +42,7 @@ describe('GET /api/comicvine/search', () => {
 		} as never);
 
 		expect(response.status).toBe(200);
+		expect(response.headers.get('cache-control')).toBe('no-store');
 		await expect(response.json()).resolves.toEqual({
 			results: [
 				{
