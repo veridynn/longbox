@@ -567,7 +567,6 @@
 		<AppHeader
 			isGuest={Boolean(auth.user?.isGuest)}
 			signedIn={Boolean(auth.user)}
-			onOpenSearch={openSearch}
 			onSaveAccount={openSaveAccount}
 			onSignOut={() => db.auth.signOut()}
 		/>

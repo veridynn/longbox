@@ -27,12 +27,13 @@ const items = [
 describe('CollectionPanel', () => {
 	it('renders the shared issue view without list-management controls', async () => {
 		const onRemoveIssue = vi.fn();
+		const onAddIssue = vi.fn();
 		render(ConfirmDeleteDialog);
 		render(CollectionPanel, {
 			errorMessage: null,
 			isLoading: false,
 			items,
-			onAddIssue: vi.fn(),
+			onAddIssue,
 			onRemoveIssue,
 			onSortKeyChange: vi.fn(),
 			onViewModeChange: vi.fn(),
@@ -41,6 +42,8 @@ describe('CollectionPanel', () => {
 		});
 
 		await expect.element(page.getByRole('heading', { name: 'Collection' })).toBeInTheDocument();
+		await page.getByRole('button', { name: 'Open comic search' }).click();
+		expect(onAddIssue).toHaveBeenCalledOnce();
 		await expect.element(page.getByLabelText('View mode')).toBeInTheDocument();
 		expect(page.getByLabelText('Search collection')).not.toBeInTheDocument();
 		await expect.element(page.getByRole('link', { name: '#1' })).toBeInTheDocument();
