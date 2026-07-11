@@ -39,7 +39,7 @@
 						</Avatar.Fallback>
 					</Avatar.Root>
 				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end" class="w-40">
+				<DropdownMenu.Content align="end" class="w-40" preventScroll={false}>
 					{#if isGuest}
 						<DropdownMenu.Group>
 							<DropdownMenu.Item onSelect={onSaveAccount}>
