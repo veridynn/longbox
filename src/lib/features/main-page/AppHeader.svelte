@@ -14,7 +14,7 @@
 </script>
 
 <header
-	class="sticky top-0 z-40 -mt-6 flex flex-col gap-5 border-b border-border bg-background/95 py-4 supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur-lg md:flex-row md:items-center md:justify-between"
+	class="sticky top-0 z-40 -mt-6 flex items-center justify-between gap-5 border-b border-border bg-background/95 py-4 supports-[backdrop-filter]:bg-background/80 supports-[backdrop-filter]:backdrop-blur-lg"
 >
 	<div class="flex items-center gap-3">
 		<div class="flex size-11 items-center justify-center rounded-md bg-primary text-primary-foreground">
