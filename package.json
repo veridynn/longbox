@@ -18,6 +18,7 @@
 		"@instantdb/admin": "^1.0.39",
 		"@instantdb/svelte": "^1.0.39",
 		"@thisux/sveltednd": "^0.4.1",
+		"@vercel/functions": "^3.7.5",
 		"bits-ui": "^2.18.1",
 		"runed": "^0.37.1",
 		"svelte-toolbelt": "^0.10.6"

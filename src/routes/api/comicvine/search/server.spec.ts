@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './+server';
-import { searchComicVineIssues } from '$lib/server/comicvine';
+import { ComicVineError, searchComicVineIssues } from '$lib/server/comicvine';
 
 vi.mock('$lib/server/comicvine', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/comicvine')>();
@@ -20,6 +20,7 @@ describe('GET /api/comicvine/search', () => {
 		const response = await GET({ url: new URL('http://localhost/api/comicvine/search') } as never);
 
 		expect(response.status).toBe(400);
+		expect(response.headers.get('cache-control')).toBe('no-store');
 		await expect(response.json()).resolves.toEqual({ error: 'Search query is required.' });
 	});
 
@@ -38,7 +39,7 @@ describe('GET /api/comicvine/search', () => {
 		]);
 
 		const response = await GET({
-			url: new URL('http://localhost/api/comicvine/search?q=batman')
+			url: new URL('http://localhost/api/comicvine/search?q=%20batman%20%20returns%20')
 		} as never);
 
 		expect(response.status).toBe(200);
@@ -57,6 +58,27 @@ describe('GET /api/comicvine/search', () => {
 				}
 			]
 		});
-		expect(searchComicVineIssues).toHaveBeenCalledWith('batman');
+		expect(searchComicVineIssues).toHaveBeenCalledWith('batman returns');
+	});
+
+	it('returns an actionable Retry-After response for velocity limits', async () => {
+		vi.mocked(searchComicVineIssues).mockRejectedValue(
+			new ComicVineError(
+				'ComicVine is temporarily rate limiting requests. Try again in 45 seconds.',
+				429,
+				45
+			)
+		);
+
+		const response = await GET({
+			url: new URL('http://localhost/api/comicvine/search?q=batman')
+		} as never);
+
+		expect(response.status).toBe(429);
+		expect(response.headers.get('cache-control')).toBe('no-store');
+		expect(response.headers.get('retry-after')).toBe('45');
+		await expect(response.json()).resolves.toEqual({
+			error: 'ComicVine is temporarily rate limiting requests. Try again in 45 seconds.'
+		});
 	});
 });

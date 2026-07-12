@@ -6,6 +6,7 @@
 	import AppHeader from "$lib/features/main-page/AppHeader.svelte";
 	import AuthGate from "$lib/features/auth/AuthGate.svelte";
 	import ComicSearchPanel from "$lib/features/search/ComicSearchPanel.svelte";
+	import { ComicSearchState } from "$lib/features/search/comic-search-state.svelte";
 	import CreateListDialog from "$lib/features/lists/CreateListDialog.svelte";
 	import CollectionPanel from "$lib/features/main-page/CollectionPanel.svelte";
 	import ListsPanel from "$lib/features/main-page/ListsPanel.svelte";
@@ -97,15 +98,12 @@
 				}
 			: null,
 	);
-	let query = $state("");
-	let results = $state<SearchIssue[]>([]);
-	let searchError = $state<string | null>(null);
+	const comicSearch = new ComicSearchState();
 	let addError = $state<string | null>(null);
 	let authError = $state<string | null>(null);
 	let authEmail = $state("");
 	let authCode = $state("");
 	let authCodeSent = $state(false);
-	let isSearching = $state(false);
 	let isSigningIn = $state(false);
 	let searchOpen = $state(false);
 	let saveAccountOpen = $state(false);
@@ -486,38 +484,6 @@
 		}
 	}
 
-	async function searchIssues() {
-		const trimmed = query.trim();
-		searchError = null;
-		addError = null;
-
-		if (!trimmed) {
-			results = [];
-			searchError = "Enter a comic title, issue, or volume.";
-			return;
-		}
-
-		isSearching = true;
-
-		try {
-			const response = await fetch(`/api/comicvine/search?q=${encodeURIComponent(trimmed)}`, {
-				cache: "no-store",
-			});
-			const body = await readJsonResponse(response);
-
-			if (!response.ok) {
-				throw new Error(body.error ?? "Search failed.");
-			}
-
-			results = body.results ?? [];
-		} catch (error) {
-			searchError = error instanceof Error ? error.message : "Search failed.";
-			results = [];
-		} finally {
-			isSearching = false;
-		}
-	}
-
 	async function addIssue(issue: SearchIssue) {
 		if (isInCollection(issue) || addingIssueIds.includes(issue.id)) {
 			return;
@@ -595,14 +561,10 @@
 				{addError}
 				{addingIssueIds}
 				bind:open={searchOpen}
-				bind:query
 				{isInCollection}
-				{isSearching}
 				onAddIssue={addIssue}
-				onSearch={searchIssues}
 				resultLimit={12}
-				{results}
-				{searchError}
+				search={comicSearch}
 			/>
 
 			{#if auth.user?.isGuest}

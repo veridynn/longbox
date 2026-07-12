@@ -4,6 +4,7 @@
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { formatDate, issueTitle } from '$lib/comics/format';
 	import type { CollectionItem, SearchIssue } from '$lib/comics/types';
+	import type { ComicSearchState } from './comic-search-state.svelte';
 
 	type Props = {
 		addError: string | null;
@@ -12,16 +13,12 @@
 		addedLabel?: string;
 		isInCollection: (issue: SearchIssue) => boolean;
 		isCollectionItemAdded?: (item: CollectionItem) => boolean;
-		isSearching: boolean;
 		collectionItems?: CollectionItem[];
 		onAddIssue: (issue: SearchIssue) => void;
 		onAddCollectionItem?: (item: CollectionItem) => void;
-		onSearch: () => void;
 		open: boolean;
-		query: string;
 		resultLimit: number;
-		results: SearchIssue[];
-		searchError: string | null;
+		search: ComicSearchState;
 		targetName?: string;
 	};
 
@@ -32,16 +29,12 @@
 		addedLabel = 'Owned',
 		isInCollection,
 		isCollectionItemAdded = () => false,
-		isSearching,
 		collectionItems = [],
 		onAddIssue,
 		onAddCollectionItem,
-		onSearch,
 		open = $bindable(),
-		query = $bindable(),
 		resultLimit,
-		results,
-		searchError,
+		search,
 		targetName = 'Collection'
 	}: Props = $props();
 
@@ -52,18 +45,6 @@
 			tick().then(() => searchInput?.focus());
 		}
 	});
-
-	function handleSearchSubmit(event: SubmitEvent) {
-		event.preventDefault();
-		onSearch();
-	}
-
-	function handleSearchKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter' && !event.isComposing) {
-			event.preventDefault();
-			onSearch();
-		}
-	}
 
 	function collectionItemTitle(item: CollectionItem) {
 		const issue = item.userIssue?.issue;
@@ -80,7 +61,7 @@
 	description="Search ComicVine issues and add them to your collection."
 	title="Search ComicVine"
 >
-	<form class="border-b border-border p-2" onsubmit={handleSearchSubmit}>
+	<div class="border-b border-border p-2">
 		<label class="sr-only" for="comic-search-command">Search comics</label>
 		<div class="relative">
 			<Search
@@ -89,37 +70,28 @@
 			<input
 				id="comic-search-command"
 				bind:this={searchInput}
-				bind:value={query}
 				class="h-10 w-full rounded-md border border-input bg-input/30 pr-3 pl-9 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+				oninput={(event) => search.setQuery(event.currentTarget.value)}
 				placeholder="Search issues, volumes, or titles"
-				onkeydown={handleSearchKeydown}
+				value={search.query}
 			/>
 		</div>
-		<div class="flex items-center justify-between gap-3 px-2 pt-2 pb-1">
-			<p class="text-xs text-muted-foreground">Press Enter to search ComicVine</p>
-			<button
-				type="submit"
-				class="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-				disabled={isSearching}
-			>
-				{#if isSearching}
-					<LoaderCircle class="size-3.5 animate-spin" />
-				{:else}
-					<Search class="size-3.5" />
-				{/if}
-				Search
-			</button>
-		</div>
-	</form>
+	</div>
 
-	{#if searchError}
-		<p class="mx-3 mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-			{searchError}
+	{#if search.error}
+		<p
+			class="mx-3 mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+			role="alert"
+		>
+			{search.error}
 		</p>
 	{/if}
 
 	{#if addError}
-		<p class="mx-3 mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+		<p
+			class="mx-3 mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+			role="alert"
+		>
 			{addError}
 		</p>
 	{/if}
@@ -127,66 +99,64 @@
 	<div class="px-3 pt-3">
 		<div class="flex items-center justify-between">
 			<h2 class="text-sm font-semibold">ComicVine results</h2>
-			{#if results.length}
+			{#if search.results.length}
 				<p class="text-xs text-muted-foreground">Showing up to {resultLimit} matches</p>
 			{/if}
 		</div>
 	</div>
 
 	<Command.List class="max-h-[min(28rem,calc(100dvh-16rem))]">
-		{#if collectionItems.length || results.length}
-			{#if collectionItems.length}
-				<div class="px-3 pt-1 pb-2">
-					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Collection</h3>
-				</div>
-				<ul class="divide-y divide-border border-b border-border">
-					{#each collectionItems as item (item.id)}
-						{@const issue = item.userIssue?.issue}
-						{@const userIssueId = item.userIssue?.id}
-						{#if issue && userIssueId}
-							<li class="flex gap-3 px-3 py-3">
-								<img
-									class="h-28 w-20 shrink-0 border border-border object-cover"
-									src={issue.coverImageUrl ?? '/robots.txt'}
-									alt=""
-								/>
-								<div class="min-w-0 flex-1">
-									<h4 class="line-clamp-2 text-sm font-semibold">{collectionItemTitle(item)}</h4>
-									<p class="mt-1 text-xs text-muted-foreground">
-										{formatDate(issue.coverDate)}
-									</p>
-								</div>
-								<button
-									type="button"
-									class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-									aria-label={isCollectionItemAdded(item)
-										? `${collectionItemTitle(item)} is already in ${targetName}`
-										: `Add ${collectionItemTitle(item)} to ${targetName}`}
-									disabled={addingUserIssueIds.includes(userIssueId) || isCollectionItemAdded(item)}
-									onclick={() => onAddCollectionItem?.(item)}
-								>
-									{#if addingUserIssueIds.includes(userIssueId)}
-										<LoaderCircle class="size-4 animate-spin" />
-									{:else if isCollectionItemAdded(item)}
-										<Check class="size-4" />
-										{addedLabel}
-									{:else}
-										<Plus class="size-4" />
-									{/if}
-								</button>
-							</li>
-						{/if}
-					{/each}
-				</ul>
-			{/if}
+		{#if collectionItems.length}
+			<div class="px-3 pt-1 pb-2">
+				<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Collection</h3>
+			</div>
+			<ul class="divide-y divide-border border-b border-border">
+				{#each collectionItems as item (item.id)}
+					{@const issue = item.userIssue?.issue}
+					{@const userIssueId = item.userIssue?.id}
+					{#if issue && userIssueId}
+						<li class="flex gap-3 px-3 py-3">
+							<img
+								class="h-28 w-20 shrink-0 border border-border object-cover"
+								src={issue.coverImageUrl ?? '/robots.txt'}
+								alt=""
+							/>
+							<div class="min-w-0 flex-1">
+								<h4 class="line-clamp-2 text-sm font-semibold">{collectionItemTitle(item)}</h4>
+								<p class="mt-1 text-xs text-muted-foreground">
+									{formatDate(issue.coverDate)}
+								</p>
+							</div>
+							<button
+								type="button"
+								class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+								aria-label={isCollectionItemAdded(item)
+									? `${collectionItemTitle(item)} is already in ${targetName}`
+									: `Add ${collectionItemTitle(item)} to ${targetName}`}
+								disabled={addingUserIssueIds.includes(userIssueId) || isCollectionItemAdded(item)}
+								onclick={() => onAddCollectionItem?.(item)}
+							>
+								{#if addingUserIssueIds.includes(userIssueId)}
+									<LoaderCircle class="size-4 animate-spin" />
+								{:else if isCollectionItemAdded(item)}
+									<Check class="size-4" />
+									{addedLabel}
+								{:else}
+									<Plus class="size-4" />
+								{/if}
+							</button>
+						</li>
+					{/if}
+				{/each}
+			</ul>
+		{/if}
 
-			{#if results.length}
-				<div class="px-3 pt-3 pb-2">
-					<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">ComicVine</h3>
-				</div>
-			{/if}
+		{#if search.results.length}
+			<div class="px-3 pt-3 pb-2">
+				<h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">ComicVine</h3>
+			</div>
 			<ul class="divide-y divide-border">
-				{#each results as issue (issue.id)}
+				{#each search.results as issue (issue.id)}
 					<li class="flex gap-3 px-3 py-3">
 						<img
 							class="h-28 w-20 shrink-0 border border-border object-cover"
@@ -230,9 +200,21 @@
 					</li>
 				{/each}
 			</ul>
-		{:else}
+		{:else if search.isSearching}
+			<p
+				class="flex items-center justify-center gap-2 px-4 py-12 text-center text-sm text-muted-foreground"
+				role="status"
+			>
+				<LoaderCircle class="size-4 animate-spin" />
+				Searching ComicVine for “{search.submittedQuery}”…
+			</p>
+		{:else if !search.error && search.hasSearched}
+			<p class="px-4 py-12 text-center text-sm text-muted-foreground" role="status">
+				No DC Comics matches found for “{search.submittedQuery}”.
+			</p>
+		{:else if !search.error}
 			<p class="px-4 py-12 text-center text-sm text-muted-foreground">
-				Search for an exact issue to add it to your Collection.
+				Type at least 2 characters to search DC Comics issues for your {targetName}.
 			</p>
 		{/if}
 	</Command.List>

@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
+	import { ComicSearchState } from '$lib/features/search/comic-search-state.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
 	import * as Rename from '$lib/components/ui/rename';
@@ -126,11 +127,8 @@
 			: null
 	);
 
-	let query = $state('');
-	let results = $state<SearchIssue[]>([]);
-	let searchError = $state<string | null>(null);
+	const comicSearch = new ComicSearchState();
 	let addError = $state<string | null>(null);
-	let isSearching = $state(false);
 	let searchOpen = $state(false);
 	let addingIssueIds = $state<number[]>([]);
 	let addingUserIssueIds = $state<string[]>([]);
@@ -215,38 +213,6 @@
 			return (await response.json()) as { results?: SearchIssue[]; error?: string };
 		} catch {
 			return {};
-		}
-	}
-
-	async function searchIssues() {
-		const trimmed = query.trim();
-		searchError = null;
-		addError = null;
-
-		if (!trimmed) {
-			results = [];
-			searchError = 'Enter a comic title, issue, or volume.';
-			return;
-		}
-
-		isSearching = true;
-
-		try {
-			const response = await fetch(`/api/comicvine/search?q=${encodeURIComponent(trimmed)}`, {
-				cache: 'no-store'
-			});
-			const body = await readJsonResponse(response);
-
-			if (!response.ok) {
-				throw new Error(body.error ?? 'Search failed.');
-			}
-
-			results = body.results ?? [];
-		} catch (error) {
-			searchError = error instanceof Error ? error.message : 'Search failed.';
-			results = [];
-		} finally {
-			isSearching = false;
 		}
 	}
 
@@ -612,17 +578,13 @@
 					{addingUserIssueIds}
 					addedLabel="Added"
 					bind:open={searchOpen}
-					bind:query
 					isInCollection={isSearchIssueInList}
 					isCollectionItemAdded={isCollectionItemInList}
-					{isSearching}
 					{collectionItems}
 					onAddIssue={addIssue}
 					onAddCollectionItem={addCollectionItem}
-					onSearch={searchIssues}
 					resultLimit={12}
-					{results}
-					{searchError}
+					search={comicSearch}
 					targetName={currentList.name}
 				/>
 			{/if}
