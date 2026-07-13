@@ -29,9 +29,10 @@ import {
 	getComicVineVolume,
 	normalizeIssueDetail,
 	normalizeSearchIssue,
+	normalizeSearchVolume,
 	normalizeVolumeDetail,
 	resetComicVineCaches,
-	searchComicVineIssues
+	searchComicVine
 } from './comicvine';
 
 beforeEach(() => {
@@ -67,9 +68,12 @@ describe('ComicVine normalization', () => {
 			coverImageUrl: 'https://img.example/issue.jpg',
 			volume: {
 				id: 456,
-				name: 'Detective Comics'
+				name: 'Detective Comics',
+				startYear: null,
+				issueCount: null,
+				coverImageUrl: null,
+				publisher: null
 			},
-			apiDetailUrl: null,
 			siteDetailUrl: 'https://comicvine.example/issue'
 		});
 	});
@@ -129,6 +133,26 @@ describe('ComicVine normalization', () => {
 		});
 	});
 
+	it('normalizes volume search context', () => {
+		expect(
+			normalizeSearchVolume({
+				id: 456,
+				name: 'Batman',
+				start_year: '1940',
+				count_of_issues: 715,
+				image: { small_url: 'https://img.example/batman.jpg' },
+				publisher: { id: 10, name: 'DC Comics' }
+			})
+		).toEqual({
+			id: 456,
+			name: 'Batman',
+			startYear: '1940',
+			issueCount: 715,
+			coverImageUrl: 'https://img.example/batman.jpg',
+			publisher: { id: 10, name: 'DC Comics' }
+		});
+	});
+
 	it('reports malformed ComicVine JSON as an upstream response error', async () => {
 		vi.stubGlobal(
 			'fetch',
@@ -138,55 +162,71 @@ describe('ComicVine normalization', () => {
 			})
 		);
 
-		await expect(searchComicVineIssues('batman')).rejects.toThrow(
+		await expect(searchComicVine({ title: 'batman' })).rejects.toThrow(
 			new ComicVineError('ComicVine returned an invalid response.')
 		);
 	});
 
-	it('batches DC-family title verification and returns twelve results', async () => {
-		const issues = Array.from({ length: 14 }, (_, index) => ({
-			id: index + 1,
-			issue_number: '1',
-			volume: { id: index + 1, name: `Volume ${index + 1}` }
-		}));
-		const responses = [
-			{ status_code: 1, results: [] },
-			{ status_code: 1, results: issues },
-			{
-				status_code: 1,
-				results: issues.map((issue, index) => ({
-					id: issue.volume.id,
-					name: issue.volume.name,
-					publisher: { id: index ? 10 : 31, name: index ? 'Vertigo' : 'Image Comics' }
-				}))
-			}
-		];
-		const fetchMock = vi.fn((_url: URL) =>
-			Promise.resolve({ ok: true, json: () => Promise.resolve(responses.shift()) })
-		);
+	it('keeps and ranks same-named DC runs without requiring punctuation', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () =>
+				Promise.resolve({
+					status_code: 1,
+					results: [
+						{
+							id: 20,
+							name: 'Batman!',
+							start_year: '2016',
+							publisher: { id: 10, name: 'DC Comics' }
+						},
+						{
+							id: 10,
+							name: 'Batman',
+							start_year: '1940',
+							publisher: { id: 10, name: 'DC Comics' }
+						},
+						{
+							id: 30,
+							name: 'Batman',
+							start_year: '2011',
+							publisher: { id: 10, name: 'DC Comics' }
+						},
+						{
+							id: 40,
+							name: 'Batman',
+							start_year: '2020',
+							publisher: { id: 31, name: 'Image Comics' }
+						}
+					]
+				})
+		});
 		vi.stubGlobal('fetch', fetchMock);
 
-		await expect(searchComicVineIssues('last laugh')).resolves.toHaveLength(12);
-		expect(fetchMock).toHaveBeenCalledTimes(3);
-		expect(fetchMock.mock.calls[1]?.[0].searchParams.get('limit')).toBe('50');
-		expect(fetchMock.mock.calls[2]?.[0].searchParams.get('filter')).toContain('id:1|2|3');
+		await expect(searchComicVine({ title: 'bat-man' })).resolves.toMatchObject({
+			mode: 'volumes',
+			results: [
+				{ id: 20, startYear: '2016' },
+				{ id: 30, startYear: '2011' },
+				{ id: 10, startYear: '1940' }
+			]
+		});
 	});
 
-	it('searches matching DC-family volumes with one combined issue request', async () => {
+	it('searches an exact issue across matching runs with volume context', async () => {
 		const responses = [
 			{
 				status_code: 1,
 				results: [
-					{ id: 10, name: 'Batman', publisher: { id: 10, name: 'DC Comics' } },
-					{ id: 30, name: 'Sandman', publisher: { id: 1, name: 'Vertigo' } },
-					{ id: 40, name: 'Spawn', publisher: { id: 31, name: 'Image Comics' } }
+					{ id: 10, name: 'Batman', start_year: '1940', publisher: { id: 10, name: 'DC Comics' } },
+					{ id: 30, name: 'Batman', start_year: '2016', publisher: { id: 10, name: 'DC Comics' } }
 				]
 			},
 			{
 				status_code: 1,
 				results: [
-					{ id: 1, issue_number: '1', volume: { id: 10, name: 'Batman' } },
-					{ id: 2, issue_number: '1', volume: { id: 30, name: 'Sandman' } }
+					{ id: 1, issue_number: '423', volume: { id: 10, name: 'Batman' } },
+					{ id: 2, issue_number: '423', volume: { id: 30, name: 'Batman' } }
 				]
 			}
 		];
@@ -195,11 +235,89 @@ describe('ComicVine normalization', () => {
 		);
 		vi.stubGlobal('fetch', fetchMock);
 
-		await expect(searchComicVineIssues('man')).resolves.toMatchObject([{ id: 1 }, { id: 2 }]);
+		await expect(searchComicVine({ title: 'Batman', issue: '#423' })).resolves.toMatchObject({
+			mode: 'issues',
+			results: [
+				{ id: 2, issueNumber: '423', volume: { id: 30, startYear: '2016' } },
+				{ id: 1, issueNumber: '423', volume: { id: 10, startYear: '1940' } }
+			]
+		});
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		expect(fetchMock.mock.calls[0]?.[0].pathname).toBe('/api/volumes/');
-		expect(fetchMock.mock.calls[1]?.[0].searchParams.get('filter')).toBe('volume:10|30');
-		expect(fetchMock.mock.calls.some(([url]) => url.pathname.includes('/publisher/'))).toBe(false);
+		expect(fetchMock.mock.calls[1]?.[0].searchParams.get('filter')).toBe(
+			'volume:30|10,issue_number:423'
+		);
+	});
+
+	it('returns only DC-family character and publisher suggestions', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () =>
+				Promise.resolve({
+					status_code: 1,
+					results: [
+						{ id: 1, name: 'Batman', publisher: { id: 10, name: 'DC Comics' } },
+						{ id: 2, name: 'Invincible', publisher: { id: 31, name: 'Image Comics' } }
+					]
+				})
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(searchComicVine({ suggest: 'character', query: 'bat' })).resolves.toEqual({
+			mode: 'suggestions',
+			hasMore: false,
+			results: [{ id: 1, type: 'character', label: 'Batman', subtitle: 'DC Comics' }]
+		});
+		expect(fetchMock.mock.calls[0]?.[0].searchParams.get('limit')).toBe('8');
+	});
+
+	it('derives character volumes from intersected issue credits', async () => {
+		const fetchMock = vi.fn((url: URL) => {
+			let results: unknown;
+			if (url.pathname.endsWith('/character/4005-1/')) {
+				results = {
+					publisher: { id: 10, name: 'DC Comics' },
+					volume_credits: [],
+					issue_credits: [{ id: 100 }, { id: 200 }]
+				};
+			} else if (url.pathname.endsWith('/character/4005-2/')) {
+				results = {
+					publisher: { id: 10, name: 'DC Comics' },
+					volume_credits: [],
+					issue_credits: [{ id: 100 }]
+				};
+			} else if (url.pathname.endsWith('/volumes/')) {
+				results = [
+					{ id: 10, name: 'Batman', start_year: '2016', publisher: { id: 10, name: 'DC Comics' } }
+				];
+			} else if (url.searchParams.get('filter')?.startsWith('id:')) {
+				results = [{ id: 100, volume: { id: 10, name: 'Batman' } }];
+			} else {
+				results = [
+					{ id: 100, issue_number: '1', volume: { id: 10, name: 'Batman' } },
+					{ id: 999, issue_number: '1', volume: { id: 10, name: 'Batman' } }
+				];
+			}
+			return Promise.resolve({
+				ok: true,
+				json: () => Promise.resolve({ status_code: 1, results })
+			});
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(searchComicVine({ characterIds: [1, 2], issue: '1' })).resolves.toMatchObject({
+			mode: 'issues',
+			results: [{ id: 100, volume: { id: 10 } }]
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(5);
+		expect(fetchMock.mock.calls[0]?.[0].searchParams.get('field_list')).not.toContain(
+			'volume_credits'
+		);
+		expect(
+			fetchMock.mock.calls
+				.find(([url]) => url.pathname.endsWith('/volumes/'))?.[0]
+				.searchParams.get('filter')
+		).toBe('id:10');
 	});
 
 	it('times out upstream requests after twelve seconds', async () => {
@@ -215,7 +333,7 @@ describe('ComicVine normalization', () => {
 			);
 		vi.stubGlobal('fetch', fetchMock);
 
-		await expect(searchComicVineIssues('batman')).rejects.toMatchObject({
+		await expect(searchComicVine({ title: 'batman' })).rejects.toMatchObject({
 			message: 'ComicVine request timed out. Please try again.',
 			status: 504
 		});
@@ -265,7 +383,11 @@ describe('ComicVine normalization', () => {
 			vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(responses.shift()) }))
 		);
 
-		await expect(searchComicVineIssues('zz')).resolves.toEqual([]);
+		await expect(searchComicVine({ title: 'zz' })).resolves.toEqual({
+			mode: 'volumes',
+			results: [],
+			hasMore: false
+		});
 		expect(fetch).toHaveBeenCalledTimes(2);
 	});
 
@@ -278,12 +400,12 @@ describe('ComicVine normalization', () => {
 		});
 		vi.stubGlobal('fetch', fetchMock);
 
-		await expect(searchComicVineIssues('man')).rejects.toMatchObject({
+		await expect(searchComicVine({ title: 'man' })).rejects.toMatchObject({
 			message: 'ComicVine is temporarily rate limiting requests. Try again in 120 seconds.',
 			retryAfterSeconds: 120,
 			status: 429
 		});
-		await expect(searchComicVineIssues('batman')).rejects.toMatchObject({ status: 429 });
+		await expect(searchComicVine({ title: 'batman' })).rejects.toMatchObject({ status: 429 });
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(mocks.runtimeCache.set).toHaveBeenCalledWith('cooldown', expect.any(Number), {
 			ttl: 120

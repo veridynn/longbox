@@ -221,13 +221,12 @@
 		const userIssueId = item.userIssue?.id;
 		const comicVineId = item.userIssue?.issue?.comicVineId;
 
-		if (!list || !userIssueId || isCollectionItemInList(item)) {
-			return;
-		}
+		if (!list || !userIssueId) return false;
+		if (isCollectionItemInList(item)) return true;
 
 		if (!auth.user || typeof comicVineId !== 'number') {
 			addError = 'This issue cannot be added to the list.';
-			return;
+			return false;
 		}
 
 		addError = null;
@@ -249,12 +248,14 @@
 						userIssue: userIssueId
 					})
 			);
+			return true;
 		} catch (error) {
 			if (isDuplicateListItemError(error)) {
-				return;
+				return true;
 			}
 
 			addError = error instanceof Error ? error.message : 'Unable to add issue to this list.';
+			return false;
 		} finally {
 			addingUserIssueIds = addingUserIssueIds.filter((idValue) => idValue !== userIssueId);
 		}
@@ -264,17 +265,16 @@
 		const collectionItem = collectionItemByComicVineId.get(issue.id);
 
 		if (collectionItem) {
-			await addCollectionItem(collectionItem);
-			return;
+			return addCollectionItem(collectionItem);
 		}
 
 		if (isSearchIssueInList(issue)) {
-			return;
+			return true;
 		}
 
 		if (!auth.user?.refresh_token || !currentList) {
 			addError = 'Sign in before adding issues.';
-			return;
+			return false;
 		}
 
 		addError = null;
@@ -294,8 +294,10 @@
 			if (!response.ok) {
 				throw new Error(body.error ?? 'Unable to add issue.');
 			}
+			return true;
 		} catch (error) {
 			addError = error instanceof Error ? error.message : 'Unable to add issue.';
+			return false;
 		} finally {
 			addingIssueIds = addingIssueIds.filter((idValue) => idValue !== issue.id);
 		}
@@ -583,7 +585,6 @@
 					{collectionItems}
 					onAddIssue={addIssue}
 					onAddCollectionItem={addCollectionItem}
-					resultLimit={12}
 					search={comicSearch}
 					targetName={currentList.name}
 				/>

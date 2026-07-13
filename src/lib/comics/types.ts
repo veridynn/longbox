@@ -1,15 +1,38 @@
+export type SearchPublisher = {
+	id: number;
+	name: string;
+};
+
+export type SearchVolume = {
+	id: number;
+	name: string;
+	startYear: string | null;
+	issueCount: number | null;
+	coverImageUrl: string | null;
+	publisher: SearchPublisher | null;
+};
+
 export type SearchIssue = {
 	id: number;
 	name: string | null;
 	issueNumber: string;
 	coverDate: string | null;
 	coverImageUrl: string | null;
-	volume: {
-		id: number | null;
-		name: string | null;
-	};
+	volume: SearchVolume;
 	siteDetailUrl: string | null;
 };
+
+export type SearchSuggestion = {
+	id: number;
+	type: 'character' | 'publisher';
+	label: string;
+	subtitle: string | null;
+};
+
+export type ComicSearchResponse =
+	| { mode: 'volumes'; results: SearchVolume[]; hasMore: boolean; nextOffset?: number }
+	| { mode: 'issues'; results: SearchIssue[]; hasMore: boolean; nextOffset?: number }
+	| { mode: 'suggestions'; results: SearchSuggestion[]; hasMore: false };
 
 export type CollectionItem = {
 	id: string;

@@ -486,12 +486,12 @@
 
 	async function addIssue(issue: SearchIssue) {
 		if (isInCollection(issue) || addingIssueIds.includes(issue.id)) {
-			return;
+			return true;
 		}
 
 		if (!auth.user?.refresh_token) {
 			addError = "Sign in before adding issues.";
-			return;
+			return false;
 		}
 
 		addError = null;
@@ -511,9 +511,11 @@
 			if (!response.ok) {
 				throw new Error(body.error ?? "Unable to add issue.");
 			}
+			return true;
 		} catch (error) {
 			addError =
 				error instanceof Error ? error.message : "Unable to add issue.";
+			return false;
 		} finally {
 			addingIssueIds = addingIssueIds.filter((id) => id !== issue.id);
 		}
@@ -563,7 +565,6 @@
 				bind:open={searchOpen}
 				{isInCollection}
 				onAddIssue={addIssue}
-				resultLimit={12}
 				search={comicSearch}
 			/>
 

@@ -110,7 +110,14 @@ describe('list item helpers', () => {
 					issueNumber: '2',
 					coverDate: null,
 					coverImageUrl: null,
-					volume: { id: null, name: null },
+					volume: {
+						id: 1,
+						name: 'Series',
+						startYear: null,
+						issueCount: null,
+						coverImageUrl: null,
+						publisher: null
+					},
 					siteDetailUrl: null
 				},
 				[]
@@ -125,7 +132,14 @@ describe('list item helpers', () => {
 					issueNumber: '4',
 					coverDate: null,
 					coverImageUrl: null,
-					volume: { id: null, name: null },
+					volume: {
+						id: 1,
+						name: 'Series',
+						startYear: null,
+						issueCount: null,
+						coverImageUrl: null,
+						publisher: null
+					},
 					siteDetailUrl: null
 				},
 				[404]

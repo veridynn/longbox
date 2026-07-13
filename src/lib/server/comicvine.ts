@@ -1,15 +1,23 @@
 import { env } from '$env/dynamic/private';
 import { getCache } from '@vercel/functions';
+import type {
+	ComicSearchResponse,
+	SearchIssue,
+	SearchSuggestion,
+	SearchVolume
+} from '$lib/comics/types';
 
 const COMIC_VINE_BASE_URL = 'https://comicvine.gamespot.com/api';
 const SEARCH_RESULT_TTL_MS = 5 * 60 * 1000;
 const MAX_MEMORY_CACHE_ENTRIES = 100;
 const MAX_CONCURRENT_REQUESTS = 3;
-const VOLUME_SEARCH_LIMIT = 25;
-const TITLE_SEARCH_LIMIT = 50;
+const SEARCH_PAGE_SIZE = 20;
+const ISSUE_PAGE_SIZE = 50;
 const COMIC_VINE_TIMEOUT_MS = 12_000;
 const DEFAULT_COOLDOWN_SECONDS = 60;
-const RUNTIME_CACHE_NAMESPACE = 'longbox-comicvine-v2';
+const RUNTIME_CACHE_NAMESPACE = 'longbox-comicvine-v5';
+const CREDIT_BATCH_SIZE = 50;
+const CHARACTER_ISSUE_PAGE_SIZE = 50;
 const DC_PUBLISHERS = new Set([
 	'all-american publications',
 	'black label',
@@ -47,19 +55,7 @@ type ComicVineReference = {
 	roles?: string | string[] | null;
 };
 
-export type ComicVineSearchIssue = {
-	id: number;
-	name: string | null;
-	issueNumber: string;
-	coverDate: string | null;
-	coverImageUrl: string | null;
-	volume: {
-		id: number | null;
-		name: string | null;
-	};
-	apiDetailUrl: string | null;
-	siteDetailUrl: string | null;
-};
+export type ComicVineSearchIssue = SearchIssue;
 
 export type ComicVineIssueDetail = {
 	id: number;
@@ -110,31 +106,33 @@ type ComicVineResponse<T> = {
 
 type ComicVineRecord = Record<string, unknown>;
 
-type ComicVineSearchVolume = {
-	id: number;
-	name: string;
-	publisher: { id: number; name: string } | null;
-};
-
 type CacheEntry<T> = { expiresAt: number; value: T };
+
+type CharacterCredits = {
+	issueIds: number[];
+};
 
 type ComicVineCache = {
 	cooldownUntil: number;
 	cooldownUpdatePromise?: Promise<void>;
 	activeRequests: number;
 	requestWaiters: Array<() => void>;
-	searchPromises: Map<string, Promise<ComicVineSearchIssue[]>>;
-	searchResults: Map<string, CacheEntry<ComicVineSearchIssue[]>>;
+	searchPromises: Map<string, Promise<ComicSearchResponse>>;
+	searchResults: Map<string, CacheEntry<ComicSearchResponse>>;
+	characterPromises: Map<number, Promise<CharacterCredits>>;
+	characterResults: Map<number, CacheEntry<CharacterCredits>>;
 };
 
 const comicVineCache: ComicVineCache = ((
-	globalThis as typeof globalThis & { __longboxComicVineCacheV2?: ComicVineCache }
-).__longboxComicVineCacheV2 ??= {
+	globalThis as typeof globalThis & { __longboxComicVineCacheV5?: ComicVineCache }
+).__longboxComicVineCacheV5 ??= {
 	cooldownUntil: 0,
 	activeRequests: 0,
 	requestWaiters: [],
 	searchPromises: new Map(),
-	searchResults: new Map()
+	searchResults: new Map(),
+	characterPromises: new Map(),
+	characterResults: new Map()
 });
 
 comicVineCache.cooldownUntil ??= 0;
@@ -142,6 +140,8 @@ comicVineCache.activeRequests ??= 0;
 comicVineCache.requestWaiters ??= [];
 comicVineCache.searchPromises ??= new Map();
 comicVineCache.searchResults ??= new Map();
+comicVineCache.characterPromises ??= new Map();
+comicVineCache.characterResults ??= new Map();
 
 export class ComicVineError extends Error {
 	constructor(
@@ -227,22 +227,42 @@ function memoryCacheSet<K, V>(cache: Map<K, CacheEntry<V>>, key: K, value: V, tt
 	}
 }
 
-function cachedSearchIssues(value: unknown) {
-	if (!Array.isArray(value)) return null;
+function validSearchVolume(value: unknown) {
+	const volume = objectRecord(value);
+	return typeof volume?.id === 'number' && typeof volume.name === 'string';
+}
 
-	const valid = value.every((item) => {
-		const issue = objectRecord(item);
-		const volume = objectRecord(issue?.volume);
+function cachedSearchResponse(value: unknown) {
+	const response = objectRecord(value);
+	if (
+		(response?.mode !== 'volumes' &&
+			response?.mode !== 'issues' &&
+			response?.mode !== 'suggestions') ||
+		!Array.isArray(response.results) ||
+		typeof response.hasMore !== 'boolean'
+	) {
+		return null;
+	}
+
+	const valid = response.results.every((result) => {
+		if (response.mode === 'volumes') return validSearchVolume(result);
+		if (response.mode === 'suggestions') {
+			const suggestion = objectRecord(result);
+			return (
+				typeof suggestion?.id === 'number' &&
+				typeof suggestion.label === 'string' &&
+				(suggestion.type === 'character' || suggestion.type === 'publisher')
+			);
+		}
+		const issue = objectRecord(result);
 		return (
 			typeof issue?.id === 'number' &&
 			typeof issue.issueNumber === 'string' &&
-			volume !== null &&
-			(typeof volume.id === 'number' || volume.id === null) &&
-			(typeof volume.name === 'string' || volume.name === null)
+			validSearchVolume(issue.volume)
 		);
 	});
 
-	return valid ? (value as ComicVineSearchIssue[]) : null;
+	return valid ? (value as ComicSearchResponse) : null;
 }
 
 function retryAfterSeconds(value: string | null) {
@@ -421,11 +441,21 @@ async function readComicVineResults<T>(response: Response, signal: AbortSignal) 
 	}
 }
 
-export function normalizeSearchIssue(raw: ComicVineRecord): ComicVineSearchIssue | null {
+export function normalizeSearchIssue(
+	raw: ComicVineRecord,
+	volumesById: ReadonlyMap<number, SearchVolume> = new Map()
+): ComicVineSearchIssue | null {
 	const id = numberId(raw.id);
-	if (!id) return null;
-
-	const volume = normalizeRef(raw.volume);
+	const volumeRef = normalizeRef(raw.volume);
+	if (!id || !volumeRef.id || !volumeRef.name) return null;
+	const volume = volumesById.get(volumeRef.id) ?? {
+		id: volumeRef.id,
+		name: volumeRef.name,
+		startYear: null,
+		issueCount: null,
+		coverImageUrl: null,
+		publisher: null
+	};
 
 	return {
 		id,
@@ -434,7 +464,6 @@ export function normalizeSearchIssue(raw: ComicVineRecord): ComicVineSearchIssue
 		coverDate: text(raw.cover_date),
 		coverImageUrl: imageUrl(raw.image),
 		volume,
-		apiDetailUrl: text(raw.api_detail_url),
 		siteDetailUrl: text(raw.site_detail_url)
 	};
 }
@@ -518,7 +547,7 @@ export function normalizeVolumeDetail(raw: ComicVineRecord): ComicVineVolumeDeta
 	};
 }
 
-function normalizeSearchVolume(raw: ComicVineRecord): ComicVineSearchVolume | null {
+export function normalizeSearchVolume(raw: ComicVineRecord): SearchVolume | null {
 	const id = numberId(raw.id);
 	const name = text(raw.name);
 
@@ -527,6 +556,9 @@ function normalizeSearchVolume(raw: ComicVineRecord): ComicVineSearchVolume | nu
 	return {
 		id,
 		name,
+		startYear: text(raw.start_year),
+		issueCount: numberId(raw.count_of_issues),
+		coverImageUrl: imageUrl(raw.image),
 		publisher: publisher.id && publisher.name ? { id: publisher.id, name: publisher.name } : null
 	};
 }
@@ -536,91 +568,389 @@ export function resetComicVineCaches() {
 	comicVineCache.cooldownUpdatePromise = undefined;
 	comicVineCache.searchPromises.clear();
 	comicVineCache.searchResults.clear();
+	comicVineCache.characterPromises.clear();
+	comicVineCache.characterResults.clear();
 }
 
-async function searchIssuesByPartialVolumeName(query: string, limit: number) {
-	const filterQuery = query.replace(/[,:|]/g, ' ').replace(/\s+/g, ' ').trim();
-	if (filterQuery.length < 2) return null;
+export type ComicSearchOptions = {
+	title?: string;
+	issue?: string;
+	volumeId?: number;
+	characterIds?: number[];
+	publisherId?: number;
+	suggest?: 'character' | 'publisher';
+	query?: string;
+	sort?: 'issue-asc' | 'issue-desc' | 'date-desc';
+	offset?: number;
+};
 
-	const normalizedQuery = filterQuery.toLowerCase();
-	const results = await comicVineGet<ComicVineRecord[]>('/volumes/', {
-		filter: `name:${filterQuery}`,
-		limit: VOLUME_SEARCH_LIMIT,
-		field_list: 'id,name,publisher'
-	});
-	const volumesByName = new Map<string, ComicVineSearchVolume>();
+function normalizedTitle(value: string) {
+	return value
+		.normalize('NFKD')
+		.toLocaleLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, '');
+}
 
-	for (const raw of results) {
-		const volume = normalizeSearchVolume(raw);
-		if (!volume || !DC_PUBLISHERS.has(volume.publisher?.name.toLowerCase() ?? '')) continue;
-		if (!volume.name.toLowerCase().includes(normalizedQuery)) continue;
+function isDcPublisherName(name: string | null | undefined) {
+	return DC_PUBLISHERS.has(name?.toLocaleLowerCase() ?? '');
+}
 
-		const name = volume.name.toLowerCase();
-		const current = volumesByName.get(name);
-		if (!current || volume.id > current.id) volumesByName.set(name, volume);
-	}
+function isDcSearchVolume(volume: SearchVolume) {
+	return isDcPublisherName(volume.publisher?.name);
+}
 
-	const volumes = [...volumesByName.values()]
-		.sort((first, second) => {
-			const length = first.name.length - second.name.length;
-			const position =
-				first.name.toLowerCase().indexOf(normalizedQuery) -
-				second.name.toLowerCase().indexOf(normalizedQuery);
-			return length || position || first.name.localeCompare(second.name);
+function volumeRank(name: string, query: string) {
+	const normalizedName = normalizedTitle(name);
+	if (normalizedName === query) return 0;
+	if (normalizedName.startsWith(query)) return 1;
+	return 2;
+}
+
+async function matchingVolumes(title: string) {
+	const filterTitle = title.replace(/[,:|]/g, ' ').replace(/\s+/g, ' ').trim();
+	const query = normalizedTitle(filterTitle);
+	const fields = 'id,name,start_year,count_of_issues,image,publisher';
+	const rankResults = (results: ComicVineRecord[]) =>
+		results
+			.map(normalizeSearchVolume)
+			.filter((volume): volume is SearchVolume => Boolean(volume))
+			.filter(isDcSearchVolume)
+			.filter((volume) => normalizedTitle(volume.name).includes(query))
+			.sort((first, second) => {
+				const rank = volumeRank(first.name, query) - volumeRank(second.name, query);
+				const yearOrder = (Number(second.startYear) || 0) - (Number(first.startYear) || 0);
+				return rank || yearOrder || first.name.localeCompare(second.name) || second.id - first.id;
+			});
+	const filtered = rankResults(
+		await comicVineGet<ComicVineRecord[]>('/volumes/', {
+			filter: `name:${filterTitle}`,
+			limit: 100,
+			field_list: fields
 		})
-		.slice(0, Math.min(3, limit));
+	);
+	if (filtered.length) return filtered;
 
-	if (!volumes.length) return null;
-
-	const issues = await comicVineGet<ComicVineRecord[]>('/issues/', {
-		filter: `volume:${volumes.map((volume) => volume.id).join('|')}`,
-		sort: 'cover_date:desc',
-		limit,
-		field_list: 'id,name,issue_number,cover_date,image,volume,api_detail_url,site_detail_url'
-	});
-
-	return issues
-		.map(normalizeSearchIssue)
-		.filter((issue): issue is ComicVineSearchIssue => Boolean(issue))
-		.slice(0, limit);
+	return rankResults(
+		await comicVineGet<ComicVineRecord[]>('/search/', {
+			query: filterTitle,
+			resources: 'volume',
+			limit: 100,
+			field_list: fields
+		})
+	);
 }
 
-async function searchIssuesByTitle(query: string, limit: number) {
+function rankVolumes(volumes: SearchVolume[], title?: string) {
+	const query = title ? normalizedTitle(title) : '';
+	return volumes.sort((first, second) => {
+		const rank = query ? volumeRank(first.name, query) - volumeRank(second.name, query) : 0;
+		const yearOrder = (Number(second.startYear) || 0) - (Number(first.startYear) || 0);
+		return rank || yearOrder || first.name.localeCompare(second.name) || second.id - first.id;
+	});
+}
+
+function chunked<T>(values: T[], size: number) {
+	return Array.from({ length: Math.ceil(values.length / size) }, (_, index) =>
+		values.slice(index * size, (index + 1) * size)
+	);
+}
+
+async function volumesByIds(ids: number[]) {
+	if (!ids.length) return [];
+	const fields = 'id,name,start_year,count_of_issues,image,publisher';
+	const batches = await Promise.all(
+		chunked(ids, CREDIT_BATCH_SIZE).map((batch) =>
+			comicVineGet<ComicVineRecord[]>('/volumes/', {
+				filter: `id:${batch.join('|')}`,
+				limit: 100,
+				field_list: fields
+			})
+		)
+	);
+	return batches
+		.flat()
+		.map(normalizeSearchVolume)
+		.filter((volume): volume is SearchVolume => Boolean(volume))
+		.filter(isDcSearchVolume);
+}
+
+function validCharacterCredits(value: unknown): value is CharacterCredits {
+	const credits = objectRecord(value);
+	return Array.isArray(credits?.issueIds) && credits.issueIds.every((id) => typeof id === 'number');
+}
+
+async function characterCredits(characterId: number) {
+	const memoryCached = memoryCacheGet(comicVineCache.characterResults, characterId);
+	if (memoryCached) return memoryCached;
+	const pending = comicVineCache.characterPromises.get(characterId);
+	if (pending) return pending;
+
+	const request = (async () => {
+		const runtimeKey = `character:${characterId}`;
+		const runtimeCached = await runtimeCacheGet(runtimeKey);
+		if (validCharacterCredits(runtimeCached)) {
+			memoryCacheSet(
+				comicVineCache.characterResults,
+				characterId,
+				runtimeCached,
+				SEARCH_RESULT_TTL_MS
+			);
+			return runtimeCached;
+		}
+
+		const raw = await comicVineGet<ComicVineRecord>(`/character/4005-${characterId}/`, {
+			field_list: 'publisher,issue_credits'
+		});
+		const refs = (value: unknown) =>
+			(Array.isArray(value) ? value : [])
+				.map((reference) => numberId(objectRecord(reference)?.id))
+				.filter((id): id is number => Boolean(id));
+		const credits = isDcPublisherName(normalizeRef(raw.publisher).name)
+			? { issueIds: refs(raw.issue_credits) }
+			: { issueIds: [] };
+		memoryCacheSet(comicVineCache.characterResults, characterId, credits, SEARCH_RESULT_TTL_MS);
+		await runtimeCacheSet(runtimeKey, credits, SEARCH_RESULT_TTL_MS / 1000);
+		return credits;
+	})();
+
+	comicVineCache.characterPromises.set(characterId, request);
+	try {
+		return await request;
+	} finally {
+		comicVineCache.characterPromises.delete(characterId);
+	}
+}
+
+async function intersectedCharacterCredits(characterIds: number[]) {
+	if (!characterIds.length) return null;
+	const credits = await Promise.all(characterIds.map(characterCredits));
+	const intersect = (values: number[][]) => {
+		const result = new Set(values[0] ?? []);
+		for (const ids of values.slice(1)) {
+			const current = new Set(ids);
+			for (const id of result) if (!current.has(id)) result.delete(id);
+		}
+		return result;
+	};
+	return {
+		issueIds: intersect(credits.map((credit) => credit.issueIds))
+	};
+}
+
+async function volumesForIssueIds(issueIds: number[]) {
+	if (!issueIds.length) return [];
+	const records = await comicVineGet<ComicVineRecord[]>('/issues/', {
+		filter: `id:${issueIds.join('|')}`,
+		limit: 100,
+		field_list: 'id,volume'
+	});
+	const volumeIds = Array.from(
+		new Set(
+			records
+				.map((record) => normalizeRef(record.volume).id)
+				.filter((id): id is number => Boolean(id))
+		)
+	);
+	return volumesByIds(volumeIds);
+}
+
+async function characterVolumePage(
+	issueIds: ReadonlySet<number>,
+	title: string | undefined,
+	publisherId: number | undefined,
+	offset: number
+) {
+	const sortedIssueIds = [...issueIds].sort((first, second) => second - first);
+	const pageIssueIds = sortedIssueIds.slice(offset, offset + CHARACTER_ISSUE_PAGE_SIZE);
+	const normalizedQuery = title ? normalizedTitle(title) : '';
+	let volumes = await volumesForIssueIds(pageIssueIds);
+	if (normalizedQuery) {
+		volumes = volumes.filter((volume) => normalizedTitle(volume.name).includes(normalizedQuery));
+	}
+	if (publisherId) volumes = volumes.filter((volume) => volume.publisher?.id === publisherId);
+	const hasMore = sortedIssueIds.length > offset + CHARACTER_ISSUE_PAGE_SIZE;
+	return {
+		volumes: rankVolumes(volumes, title).slice(0, SEARCH_PAGE_SIZE),
+		hasMore,
+		nextOffset: hasMore ? offset + CHARACTER_ISSUE_PAGE_SIZE : undefined
+	};
+}
+
+function normalizeSuggestion(
+	raw: ComicVineRecord,
+	type: 'character' | 'publisher'
+): SearchSuggestion | null {
+	const id = numberId(raw.id);
+	const label = text(raw.name);
+	if (!id || !label) return null;
+	const publisher = normalizeRef(raw.publisher).name;
+	if (type === 'publisher' ? !isDcPublisherName(label) : !isDcPublisherName(publisher)) return null;
+	return { id, type, label, subtitle: type === 'character' ? publisher : null };
+}
+
+async function searchSuggestions(type: 'character' | 'publisher', query: string) {
 	const results = await comicVineGet<ComicVineRecord[]>('/search/', {
 		query,
-		resources: 'issue',
-		limit: Math.min(Math.max(limit * 4, TITLE_SEARCH_LIMIT), 100),
-		field_list: 'id,name,issue_number,cover_date,image,volume,api_detail_url,site_detail_url'
-	});
-	const issues = results
-		.map(normalizeSearchIssue)
-		.filter((issue): issue is ComicVineSearchIssue => Boolean(issue));
-	const volumeIds = Array.from(
-		new Set(issues.map((issue) => issue.volume.id).filter((id): id is number => Boolean(id)))
-	);
-	if (!volumeIds.length) return [];
-
-	const volumes = await comicVineGet<ComicVineRecord[]>('/volumes/', {
-		filter: `id:${volumeIds.join('|')}`,
-		limit: volumeIds.length,
+		resources: type,
+		limit: 8,
 		field_list: 'id,name,publisher'
 	});
-	const dcVolumeIds = new Set(
-		volumes
-			.map(normalizeSearchVolume)
-			.filter((volume): volume is ComicVineSearchVolume => Boolean(volume))
-			.filter((volume) => DC_PUBLISHERS.has(volume.publisher?.name.toLowerCase() ?? ''))
-			.map((volume) => volume.id)
-	);
-
-	return issues
-		.filter((issue) => issue.volume.id && dcVolumeIds.has(issue.volume.id))
-		.slice(0, limit);
+	return {
+		mode: 'suggestions' as const,
+		results: results
+			.map((result) => normalizeSuggestion(result, type))
+			.filter((result): result is SearchSuggestion => Boolean(result))
+			.slice(0, 8),
+		hasMore: false as const
+	};
 }
 
-export async function searchComicVineIssues(query: string, limit = 12) {
-	const normalizedQuery = query.trim().replace(/\s+/g, ' ');
-	const cacheKey = `${limit}:${normalizedQuery.toLowerCase()}`;
+function volumeFromDetail(volume: ComicVineVolumeDetail): SearchVolume {
+	return {
+		id: volume.id,
+		name: volume.name,
+		startYear: volume.startYear,
+		issueCount: volume.issueCount,
+		coverImageUrl: volume.coverImageUrl,
+		publisher: volume.publisher
+	};
+}
+
+const ISSUE_FIELDS = 'id,name,issue_number,cover_date,image,volume,site_detail_url';
+const issueNumberCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+async function issuesForVolumes(
+	volumes: SearchVolume[],
+	issue: string | undefined,
+	sort: ComicSearchOptions['sort'],
+	offset: number,
+	allowedIssueIds?: ReadonlySet<number>
+): Promise<Extract<ComicSearchResponse, { mode: 'issues' }>> {
+	if (!volumes.length) return { mode: 'issues', results: [], hasMore: false };
+	const cleanIssue = issue?.trim().replace(/^#/, '');
+	const pageSize = cleanIssue ? 100 : ISSUE_PAGE_SIZE;
+	const filter = [
+		`volume:${volumes.map((volume) => volume.id).join('|')}`,
+		cleanIssue ? `issue_number:${cleanIssue}` : null
+	]
+		.filter(Boolean)
+		.join(',');
+	const sortValue =
+		sort === 'issue-desc'
+			? 'issue_number:desc'
+			: sort === 'date-desc'
+				? 'cover_date:desc'
+				: 'issue_number:asc';
+	const rawIssues = await comicVineGet<ComicVineRecord[]>('/issues/', {
+		filter,
+		sort: sortValue,
+		limit: cleanIssue ? pageSize : pageSize + 1,
+		offset: cleanIssue ? undefined : offset,
+		field_list: ISSUE_FIELDS
+	});
+	const volumesById = new Map(volumes.map((volume) => [volume.id, volume]));
+	const normalized = rawIssues
+		.map((raw) => normalizeSearchIssue(raw, volumesById))
+		.filter((result): result is SearchIssue => Boolean(result))
+		.filter((result) => !allowedIssueIds || allowedIssueIds.has(result.id));
+	const volumeOrder = new Map(volumes.map((volume, index) => [volume.id, index]));
+	normalized.sort((first, second) => {
+		if (cleanIssue) {
+			return (volumeOrder.get(first.volume.id) ?? 0) - (volumeOrder.get(second.volume.id) ?? 0);
+		}
+		if (sort === 'date-desc') {
+			return (second.coverDate ?? '').localeCompare(first.coverDate ?? '');
+		}
+		const order = issueNumberCollator.compare(first.issueNumber, second.issueNumber);
+		return sort === 'issue-desc' ? -order : order;
+	});
+
+	return {
+		mode: 'issues',
+		results: normalized.slice(0, pageSize),
+		hasMore: !cleanIssue && rawIssues.length > pageSize,
+		...(!cleanIssue && rawIssues.length > pageSize ? { nextOffset: offset + pageSize } : {})
+	};
+}
+
+async function performComicSearch(options: ComicSearchOptions): Promise<ComicSearchResponse> {
+	if (options.suggest && options.query) return searchSuggestions(options.suggest, options.query);
+
+	const offset = Math.max(0, options.offset ?? 0);
+	const credits = await intersectedCharacterCredits(options.characterIds ?? []);
+	if (options.volumeId) {
+		const volume = volumeFromDetail(await fetchComicVineVolume(options.volumeId));
+		if (!isDcSearchVolume(volume)) return { mode: 'issues', results: [], hasMore: false };
+		if (options.publisherId && volume.publisher?.id !== options.publisherId) {
+			return { mode: 'issues', results: [], hasMore: false };
+		}
+		return issuesForVolumes([volume], options.issue, options.sort, offset, credits?.issueIds);
+	}
+	if (credits) {
+		const page = await characterVolumePage(
+			credits.issueIds,
+			options.title,
+			options.publisherId,
+			offset
+		);
+		if (options.issue) {
+			const response = await issuesForVolumes(
+				page.volumes,
+				options.issue,
+				options.sort,
+				0,
+				credits.issueIds
+			);
+			return {
+				...response,
+				hasMore: page.hasMore,
+				...(page.nextOffset ? { nextOffset: page.nextOffset } : {})
+			};
+		}
+		return {
+			mode: 'volumes',
+			results: page.volumes,
+			hasMore: page.hasMore,
+			...(page.nextOffset ? { nextOffset: page.nextOffset } : {})
+		};
+	}
+
+	let volumes = options.title ? await matchingVolumes(options.title) : [];
+	if (options.publisherId) {
+		volumes = volumes.filter((volume) => volume.publisher?.id === options.publisherId);
+	}
+	volumes = rankVolumes(volumes, options.title);
+	if (options.issue) {
+		const page = volumes.slice(offset, offset + SEARCH_PAGE_SIZE);
+		const response = await issuesForVolumes(page, options.issue, options.sort, 0);
+		const hasMore = volumes.length > offset + SEARCH_PAGE_SIZE;
+		return {
+			...response,
+			hasMore,
+			...(hasMore ? { nextOffset: offset + SEARCH_PAGE_SIZE } : {})
+		};
+	}
+
+	const hasMore = volumes.length > offset + SEARCH_PAGE_SIZE;
+	return {
+		mode: 'volumes',
+		results: volumes.slice(offset, offset + SEARCH_PAGE_SIZE),
+		hasMore,
+		...(hasMore ? { nextOffset: offset + SEARCH_PAGE_SIZE } : {})
+	};
+}
+
+export async function searchComicVine(options: ComicSearchOptions) {
+	const normalizedOptions = {
+		...options,
+		title: options.title?.trim().replace(/\s+/g, ' '),
+		issue: options.issue?.trim().replace(/^#/, ''),
+		query: options.query?.trim().replace(/\s+/g, ' '),
+		characterIds: Array.from(new Set(options.characterIds ?? [])).sort((a, b) => a - b),
+		offset: Math.max(0, options.offset ?? 0),
+		sort: options.sort ?? 'issue-asc'
+	};
+	const cacheKey = JSON.stringify(normalizedOptions).toLocaleLowerCase();
 	const memoryCached = memoryCacheGet(comicVineCache.searchResults, cacheKey);
 	if (memoryCached !== undefined) return memoryCached;
 
@@ -628,15 +958,14 @@ export async function searchComicVineIssues(query: string, limit = 12) {
 	if (pending) return pending;
 
 	const search = (async () => {
-		const runtimeCached = cachedSearchIssues(await runtimeCacheGet(`search:${cacheKey}`));
+		const runtimeCached = cachedSearchResponse(await runtimeCacheGet(`search:${cacheKey}`));
 		if (runtimeCached) {
 			memoryCacheSet(comicVineCache.searchResults, cacheKey, runtimeCached, SEARCH_RESULT_TTL_MS);
 			return runtimeCached;
 		}
 
 		await assertNotCoolingDown();
-		const volumeIssues = await searchIssuesByPartialVolumeName(normalizedQuery, limit);
-		const results = volumeIssues ?? (await searchIssuesByTitle(normalizedQuery, limit));
+		const results = await performComicSearch(normalizedOptions);
 
 		memoryCacheSet(comicVineCache.searchResults, cacheKey, results, SEARCH_RESULT_TTL_MS);
 		await runtimeCacheSet(`search:${cacheKey}`, results, SEARCH_RESULT_TTL_MS / 1000);

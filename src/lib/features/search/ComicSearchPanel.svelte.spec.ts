@@ -1,4 +1,4 @@
-import { page } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { cleanup, render } from 'vitest-browser-svelte';
 import '../../../routes/layout.css';
@@ -12,67 +12,147 @@ function renderSearch(search: ComicSearchState, props = {}) {
 		isInCollection: () => false,
 		onAddIssue: vi.fn(),
 		open: true,
-		resultLimit: 12,
 		search,
 		...props
 	});
 }
 
-function jsonResponse(body: unknown, status = 200) {
-	return new Response(JSON.stringify(body), {
-		headers: { 'content-type': 'application/json' },
-		status
-	});
+function jsonResponse(body: unknown) {
+	return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 }
+
+const volumes = [
+	{
+		id: 2,
+		name: 'Batman',
+		startYear: '2016',
+		issueCount: 85,
+		coverImageUrl: null,
+		publisher: { id: 10, name: 'DC Comics' }
+	},
+	{
+		id: 1,
+		name: 'Batman',
+		startYear: '1940',
+		issueCount: 715,
+		coverImageUrl: null,
+		publisher: { id: 10, name: 'DC Comics' }
+	}
+];
 
 afterEach(() => {
 	cleanup();
-	vi.useRealTimers();
 	vi.unstubAllGlobals();
 });
 
 describe('ComicSearchPanel', () => {
-	it('automatically searches and renders the response', async () => {
-		vi.useFakeTimers();
-		let resolveResponse!: (response: Response) => void;
-		const response = new Promise<Response>((resolve) => {
-			resolveResponse = resolve;
-		});
-		const fetchMock = vi.fn().mockReturnValue(response);
+	it('supports slash commands and commits resolved character tags', async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(jsonResponse({ mode: 'volumes', hasMore: false, results: [] }));
 		vi.stubGlobal('fetch', fetchMock);
 		const search = new ComicSearchState();
 		renderSearch(search);
+		await expect.element(page.getByRole('button', { name: 'Search' })).toBeInTheDocument();
 
-		await expect.element(page.getByText(/Type at least 2 characters/)).toBeInTheDocument();
-		await expect.element(page.getByRole('button', { name: 'Search' })).not.toBeInTheDocument();
-		await page.getByLabelText('Search comics').fill('man');
-		await vi.advanceTimersByTimeAsync(400);
+		await page.getByLabelText('Find comics').fill('/');
 		await expect
-			.element(page.getByRole('status'))
-			.toHaveTextContent('Searching ComicVine for “man”');
-
-		resolveResponse(
-			jsonResponse({
-				results: [
-					{
-						id: 286879,
-						name: 'In Storybook Endings',
-						issueNumber: '713',
-						coverDate: '2011-10-01',
-						coverImageUrl: null,
-						volume: { id: 796, name: 'Batman' },
-						siteDetailUrl: null
-					}
-				]
-			})
-		);
-
-		await expect
-			.element(page.getByRole('heading', { name: 'Batman #713: In Storybook Endings' }))
+			.element(page.getByRole('option', { name: '/character Character' }))
 			.toBeInTheDocument();
-		expect(fetchMock).toHaveBeenCalledWith('/api/comicvine/search?q=man', {
-			cache: 'no-store',
-			signal: expect.any(AbortSignal)
+		await page.getByRole('option', { name: '/character Character' }).click();
+		await page.getByLabelText('Find comics').fill('Batman');
+		search.suggestions = [{ id: 1, type: 'character', label: 'Batman', subtitle: 'DC Comics' }];
+		await page.getByRole('option', { name: 'Batman DC Comics' }).click();
+
+		await expect.element(page.getByText('Character: Batman')).toBeInTheDocument();
+		expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
+			'/api/comicvine/search?characterId=1&sort=issue-asc'
+		);
+	});
+
+	it('shows runs collapsed and lazy-loads them', async () => {
+		const issue = {
+			id: 423,
+			name: 'You Shoulda Seen Him',
+			issueNumber: '423',
+			coverDate: '1988-09-01',
+			coverImageUrl: null,
+			siteDetailUrl: null,
+			volume: volumes[0]
+		};
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(jsonResponse({ mode: 'volumes', hasMore: false, results: volumes }))
+			.mockResolvedValueOnce(jsonResponse({ mode: 'issues', hasMore: false, results: [issue] }))
+			.mockResolvedValueOnce(jsonResponse({ mode: 'issues', hasMore: false, results: [] }));
+		vi.stubGlobal('fetch', fetchMock);
+		renderSearch(new ComicSearchState(), {
+			isInCollection: (candidate: { id: number }) => candidate.id === 423
 		});
+
+		const input = page.getByLabelText('Find comics');
+		await input.fill('Batman');
+		await input.click();
+		await userEvent.keyboard('{Enter}');
+
+		await expect.element(page.getByText('Volume: Batman')).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: 'Batman (2016)', exact: true }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: 'Batman (1940)', exact: true }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('heading', { name: 'Batman (2016) #423: You Shoulda Seen Him' }))
+			.not.toBeInTheDocument();
+		expect(fetchMock).toHaveBeenCalledOnce();
+
+		await page.getByRole('heading', { name: 'Batman (2016)', exact: true }).click();
+		await expect
+			.element(page.getByRole('heading', { name: 'Batman (2016) #423: You Shoulda Seen Him' }))
+			.toBeInTheDocument();
+
+		await page.getByRole('heading', { name: 'Batman (1940)', exact: true }).click();
+		await expect.poll(() => fetchMock.mock.calls.length).toBe(3);
+		expect(
+			new URL(fetchMock.mock.calls[2]?.[0], 'http://localhost').searchParams.get('volumeId')
+		).toBe('1');
+
+		await page.getByRole('button', { name: 'Hide owned' }).click();
+		await expect
+			.element(page.getByRole('heading', { name: 'Batman (2016) #423: You Shoulda Seen Him' }))
+			.not.toBeInTheDocument();
+	});
+
+	it('adds every issue in a selected volume', async () => {
+		const issue = {
+			id: 1,
+			name: null,
+			issueNumber: '1',
+			coverDate: null,
+			coverImageUrl: null,
+			siteDetailUrl: null,
+			volume: volumes[0]
+		};
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(
+				jsonResponse({ mode: 'volumes', hasMore: false, results: [volumes[0]] })
+			)
+			.mockResolvedValueOnce(jsonResponse({ mode: 'issues', hasMore: false, results: [] }))
+			.mockResolvedValueOnce(jsonResponse({ mode: 'issues', hasMore: false, results: [issue] }));
+		vi.stubGlobal('fetch', fetchMock);
+		const onAddIssue = vi.fn().mockResolvedValue(true);
+		renderSearch(new ComicSearchState(), { onAddIssue });
+
+		const input = page.getByLabelText('Find comics');
+		await input.fill('Batman');
+		await input.click();
+		await userEvent.keyboard('{Enter}');
+		await page.getByRole('heading', { name: 'Batman (2016)', exact: true }).click();
+		await page.getByRole('button', { name: 'Add whole volume' }).click();
+
+		await expect.poll(() => onAddIssue.mock.calls.length).toBe(1);
+		expect(onAddIssue).toHaveBeenCalledWith(issue);
 	});
 });

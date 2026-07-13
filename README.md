@@ -29,6 +29,7 @@ vp install && vpr dev
 - [ ] Prevent duplicate collection issues
 - [ ] Dev/prod InstantDB env split needs to be documented and verified end to end
 - [ ] PWA caching still needs a dev-mode strategy
+- [ ] Add publisher-only recent-run search after choosing a bounded scan or local index; Comic Vine cannot filter volumes by publisher or sort them by start year
 - [ ] Remove env file setup
 - [ ] Fix back button from list page to issue detail page (leads to main page instead of back to list page)
 - [ ] rework list component
