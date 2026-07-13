@@ -7,7 +7,6 @@ import type {
 
 type SearchResponse = ComicSearchResponse | { error?: string };
 
-export type ComicSearchSort = 'issue-asc' | 'issue-desc' | 'date-desc';
 export type SearchTag =
 	| { type: 'volume'; value: string; label: string }
 	| { type: 'issue'; value: string; label: string }
@@ -76,12 +75,10 @@ export class ComicSearchState {
 	isSuggesting = $state(false);
 	suggestionError = $state<string | null>(null);
 	inputError = $state<string | null>(null);
-	hideOwned = $state(false);
 	volumes = $state<SearchVolume[]>([]);
 	volumeIssues = $state<Record<number, VolumeIssueState>>({});
 	openVolumeIds = $state<number[]>([]);
 	mode = $state<'volumes' | 'issues'>('volumes');
-	sort = $state<ComicSearchSort>('issue-asc');
 	error = $state<string | null>(null);
 	isSearching = $state(false);
 	hasSearched = $state(false);
@@ -368,17 +365,6 @@ export class ComicSearchState {
 		}
 	}
 
-	async setSort(sort: ComicSearchSort) {
-		this.sort = sort;
-		if (this.issueTag) {
-			await this.search();
-			return;
-		}
-		const openVolumes = this.volumes.filter((volume) => this.openVolumeIds.includes(volume.id));
-		this.volumeIssues = {};
-		await Promise.all(openVolumes.map((volume) => this.loadVolume(volume)));
-	}
-
 	reset() {
 		this.#cancelAll();
 		this.filterType = 'volume';
@@ -388,8 +374,6 @@ export class ComicSearchState {
 		this.isSuggesting = false;
 		this.suggestionError = null;
 		this.inputError = null;
-		this.hideOwned = false;
-		this.sort = 'issue-asc';
 		this.#clearResults(false);
 	}
 
@@ -425,7 +409,7 @@ export class ComicSearchState {
 		for (const character of this.characterTags) {
 			params.append('characterId', String(character.id));
 		}
-		params.set('sort', this.sort);
+		params.set('sort', 'issue-asc');
 		return params;
 	}
 

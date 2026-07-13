@@ -53,13 +53,19 @@ describe('ComicSearchPanel', () => {
 		vi.stubGlobal('fetch', fetchMock);
 		const search = new ComicSearchState();
 		renderSearch(search);
+		await expect.element(page.getByLabelText('Find comics')).toHaveFocus();
 		await expect.element(page.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+		await expect.element(page.getByPlaceholder('Search by volume')).toBeInTheDocument();
+		await expect.element(page.getByText('Type / for search commands')).toBeInTheDocument();
+		await expect.element(page.getByText('Sort issues')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Hide owned' })).not.toBeInTheDocument();
 
 		await page.getByLabelText('Find comics').fill('/');
 		await expect
 			.element(page.getByRole('option', { name: '/character Character' }))
 			.toBeInTheDocument();
 		await page.getByRole('option', { name: '/character Character' }).click();
+		await expect.element(page.getByPlaceholder('Search by character')).toBeInTheDocument();
 		await page.getByLabelText('Find comics').fill('Batman');
 		search.suggestions = [{ id: 1, type: 'character', label: 'Batman', subtitle: 'DC Comics' }];
 		await page.getByRole('option', { name: 'Batman DC Comics' }).click();
@@ -117,11 +123,6 @@ describe('ComicSearchPanel', () => {
 		expect(
 			new URL(fetchMock.mock.calls[2]?.[0], 'http://localhost').searchParams.get('volumeId')
 		).toBe('1');
-
-		await page.getByRole('button', { name: 'Hide owned' }).click();
-		await expect
-			.element(page.getByRole('heading', { name: 'Batman (2016) #423: You Shoulda Seen Him' }))
-			.not.toBeInTheDocument();
 	});
 
 	it('adds every issue in a selected volume', async () => {

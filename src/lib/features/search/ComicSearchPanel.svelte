@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { Check, ChevronDown, EyeOff, LoaderCircle, Plus, RotateCcw, Search, X } from '@lucide/svelte';
+	import { Check, ChevronDown, LoaderCircle, Plus, RotateCcw, Search, X } from '@lucide/svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import { formatDate } from '$lib/comics/format';
 	import type {
@@ -11,7 +11,6 @@
 	} from '$lib/comics/types';
 	import {
 		SEARCH_COMMANDS,
-		type ComicSearchSort,
 		type ComicSearchState,
 		type SearchTag,
 		type SearchTagType
@@ -87,7 +86,7 @@
 	});
 
 	$effect(() => {
-		if (open) tick().then(() => composerInput?.focus());
+		if (open) tick().then(() => requestAnimationFrame(() => composerInput?.focus()));
 	});
 
 	function updateDraft(value: string) {
@@ -151,15 +150,7 @@
 	}
 
 	function placeholder(type: SearchTagType) {
-		if (type === 'volume') return 'Batman';
-		if (type === 'character') return 'Batman';
-		if (type === 'publisher') return 'DC Comics';
-		return '423 or Annual 1';
-	}
-
-	function visibleIssues(volumeId: number) {
-		const issues = search.volumeIssues[volumeId]?.issues ?? [];
-		return search.hideOwned ? issues.filter((issue) => !isInCollection(issue)) : issues;
+		return `Search by ${type}`;
 	}
 
 	async function addVolume(volume: SearchVolume) {
@@ -191,7 +182,7 @@
 
 <Command.Dialog
 	bind:open
-	class="top-8 max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-5xl translate-y-0 sm:max-w-5xl"
+	class="top-8 max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-2xl translate-y-0 sm:max-w-2xl"
 	description="Find DC Comics volumes and issues by volume, character, publisher, or issue number."
 	title="Add comics"
 >
@@ -221,7 +212,7 @@
 						aria-expanded={showMenu}
 						oninput={(event) => updateDraft(event.currentTarget.value)}
 						onkeydown={handleComposerKeydown}
-						placeholder={`${placeholder(search.filterType)} or /character`}
+						placeholder={placeholder(search.filterType)}
 						value={search.draft}
 					/>
 				</div>
@@ -248,22 +239,24 @@
 			{/if}
 		</div>
 
-		{#if search.tags.length}
-			<div class="flex flex-wrap items-center gap-2" aria-label="Active comic searches">
-				{#each search.tags as tag (`${tag.type}:${tag.type === 'character' || tag.type === 'publisher' ? tag.id : tag.value}`)}
-					<span class="inline-flex h-8 items-center gap-1 rounded-full border border-border bg-muted px-2.5 text-xs font-medium">
-						{tagLabel(tag)}
-						<button type="button" class="rounded-full p-0.5 hover:bg-background" aria-label={`Remove ${tagLabel(tag)}`} onclick={() => search.removeTag(tag)}><X class="size-3.5" /></button>
-					</span>
-				{/each}
-				<button type="button" class="ml-auto inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground" onclick={() => search.reset()}><RotateCcw class="size-3.5" /> Clear</button>
-			</div>
-		{/if}
-
-		<div class="text-xs text-muted-foreground">
-			{#if search.inputError}<p class="text-destructive" role="alert">{search.inputError}</p>
-			{:else if search.tags.length && !search.hasAnchor}<p>Add a Volume or Character search. Publisher and Issue only refine results.</p>
-			{:else}<p>Choose what to search or type <kbd class="rounded border border-border px-1">/</kbd> for commands. Search tags combine with AND.</p>{/if}
+		<div class="relative h-8" aria-label="Active comic searches">
+			{#if search.inputError}
+				<p class="flex h-8 items-center text-xs text-destructive" role="alert">{search.inputError}</p>
+			{:else if search.tags.length}
+				<div class="flex h-8 gap-2 overflow-x-auto pr-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+					{#each search.tags as tag (`${tag.type}:${tag.type === 'character' || tag.type === 'publisher' ? tag.id : tag.value}`)}
+						<span class="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-border bg-muted px-2.5 text-xs font-medium">
+							{tagLabel(tag)}
+							<button type="button" class="rounded-full p-0.5 hover:bg-background" aria-label={`Remove ${tagLabel(tag)}`} onclick={() => search.removeTag(tag)}><X class="size-3.5" /></button>
+						</span>
+					{/each}
+				</div>
+				<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center bg-gradient-to-r from-transparent via-popover to-popover pl-8">
+					<button type="button" class="pointer-events-auto inline-flex h-8 items-center gap-1 bg-popover pl-2 text-xs font-medium text-muted-foreground hover:text-foreground" onclick={() => search.reset()}><RotateCcw class="size-3.5" /> Clear</button>
+				</div>
+			{:else}
+				<p class="flex h-8 items-center gap-1 text-xs text-muted-foreground">Type <kbd class="rounded border border-border px-1">/</kbd> for search commands</p>
+			{/if}
 		</div>
 	</form>
 
@@ -274,21 +267,7 @@
 		</div>
 	{/if}
 
-	<div class="flex items-center justify-between gap-3 px-4 pt-3">
-		<h2 class="text-sm font-semibold">{search.volumes.length ? `${search.volumes.length} matching runs` : 'Matching runs'}</h2>
-		<div class="flex items-center gap-2">
-			{#if search.volumes.length}
-				<label class="flex items-center gap-2 text-xs text-muted-foreground">Sort issues
-					<select class="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground" value={search.sort} onchange={(event) => search.setSort(event.currentTarget.value as ComicSearchSort)}>
-						<option value="issue-asc">Issue # ascending</option>
-						<option value="issue-desc">Issue # descending</option>
-						<option value="date-desc">Cover date newest</option>
-					</select>
-				</label>
-				<button type="button" class={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${search.hideOwned ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted'}`} aria-pressed={search.hideOwned} onclick={() => (search.hideOwned = !search.hideOwned)}><EyeOff class="size-3.5" /> Hide owned</button>
-			{/if}
-		</div>
-	</div>
+	<h2 class="px-4 pt-3 text-sm font-semibold">{search.volumes.length ? `${search.volumes.length} matching runs` : 'Matching runs'}</h2>
 
 	<Command.List class="max-h-[min(38rem,calc(100dvh-17rem))]">
 		{#if matchingCollectionItems.length}
@@ -298,10 +277,10 @@
 					{@const issue = item.userIssue?.issue}
 					{@const userIssueId = item.userIssue?.id}
 					{#if issue && userIssueId}
-						<li class="flex gap-3 px-4 py-3">
+						<li class="grid grid-cols-[4rem_minmax(0,1fr)] gap-3 px-3 py-3 sm:flex sm:px-4">
 							<img class="h-24 w-16 shrink-0 border border-border object-cover" src={issue.coverImageUrl ?? '/robots.txt'} alt="" />
 							<div class="min-w-0 flex-1"><h4 class="line-clamp-2 text-sm font-semibold">{collectionItemTitle(item)}</h4><p class="mt-1 text-xs text-muted-foreground">{formatDate(issue.coverDate)}</p></div>
-							<button type="button" class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-70" disabled={addingUserIssueIds.includes(userIssueId) || isCollectionItemAdded(item)} onclick={() => onAddCollectionItem?.(item)}>
+							<button type="button" class="col-start-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-70 sm:col-auto sm:shrink-0" disabled={addingUserIssueIds.includes(userIssueId) || isCollectionItemAdded(item)} onclick={() => onAddCollectionItem?.(item)}>
 								{#if addingUserIssueIds.includes(userIssueId)}<LoaderCircle class="size-4 animate-spin" />{:else if isCollectionItemAdded(item)}<Check class="size-4" /> {addedLabel}{:else}<Plus class="size-4" /> Add{/if}
 							</button>
 						</li>
@@ -327,7 +306,7 @@
 						</summary>
 
 						<div class="border-t border-border">
-							<div class="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
+							<div class="flex flex-col items-stretch gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
 								<p class="text-xs text-muted-foreground">Add every issue in this run.</p>
 								<button type="button" class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium hover:bg-muted disabled:opacity-70" disabled={addingVolumeId !== null} onclick={() => addVolume(volume)}>
 									{#if addingVolumeId === volume.id}<LoaderCircle class="size-4 animate-spin" /> Adding {volumeAddProgress.completed}/{volumeAddProgress.total || volume.issueCount || '…'}{:else}<Plus class="size-4" /> Add whole volume{/if}
@@ -340,21 +319,20 @@
 								<p class="px-4 py-8 text-center text-sm text-muted-foreground">No issues in this run match every search tag.</p>
 							{:else if volumeState?.issues.length}
 								<ul class="divide-y divide-border">
-									{#each visibleIssues(volume.id) as issue (issue.id)}
-										<li class="flex gap-3 px-4 py-3">
+									{#each volumeState.issues as issue (issue.id)}
+										<li class="grid grid-cols-[4rem_minmax(0,1fr)] gap-3 px-3 py-3 sm:flex sm:px-4">
 											<img class="h-24 w-16 shrink-0 border border-border object-cover" src={issue.coverImageUrl ?? '/robots.txt'} alt="" />
 											<div class="min-w-0 flex-1">
 												<h4 class="line-clamp-2 text-sm font-semibold">{searchIssueTitle(issue)}</h4>
 												<p class="mt-1 text-xs text-muted-foreground">{issue.volume.publisher?.name ?? 'Unknown publisher'} · {formatDate(issue.coverDate)}</p>
 												{#if issue.siteDetailUrl}<a class="mt-2 inline-block text-xs font-medium underline-offset-4 hover:underline" href={issue.siteDetailUrl} target="_blank" rel="noreferrer">View on ComicVine</a>{/if}
 											</div>
-											<button type="button" class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-70" aria-label={isInCollection(issue) ? `${searchIssueTitle(issue)} is already in ${targetName}` : `Add ${searchIssueTitle(issue)} to ${targetName}`} disabled={addingIssueIds.includes(issue.id) || isInCollection(issue)} onclick={() => onAddIssue(issue)}>
+											<button type="button" class="col-start-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-70 sm:col-auto sm:shrink-0" aria-label={isInCollection(issue) ? `${searchIssueTitle(issue)} is already in ${targetName}` : `Add ${searchIssueTitle(issue)} to ${targetName}`} disabled={addingIssueIds.includes(issue.id) || isInCollection(issue)} onclick={() => onAddIssue(issue)}>
 												{#if addingIssueIds.includes(issue.id)}<LoaderCircle class="size-4 animate-spin" />{:else if isInCollection(issue)}<Check class="size-4" /> {addedLabel}{:else}<Plus class="size-4" /> Add{/if}
 											</button>
 										</li>
 									{/each}
 								</ul>
-								{#if search.hideOwned && !visibleIssues(volume.id).length}<p class="px-4 py-6 text-center text-sm text-muted-foreground">All loaded matching issues are already owned.</p>{/if}
 							{/if}
 							{#if volumeState?.hasMore && !volumeState.isLoading}<div class="border-t border-border p-3 text-center"><button type="button" class="h-9 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted" onclick={() => search.loadVolume(volume, { append: true })}>Load more issues</button></div>{/if}
 						</div>
