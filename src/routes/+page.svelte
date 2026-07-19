@@ -3,7 +3,6 @@
 	import { LoaderCircle } from "@lucide/svelte";
 	import { createSearchParamsSchema, useSearchParams } from "runed/kit";
 	import { goto } from "$app/navigation";
-	import AppHeader from "$lib/features/main-page/AppHeader.svelte";
 	import AuthGate from "$lib/features/auth/AuthGate.svelte";
 	import ComicSearchPanel from "$lib/features/search/ComicSearchPanel.svelte";
 	import { ComicSearchState } from "$lib/features/search/comic-search-state.svelte";
@@ -15,7 +14,6 @@
 		validateListName,
 		type CustomListSummary,
 	} from "$lib/features/lists/lists";
-	import SaveAccountDialog from "$lib/features/auth/SaveAccountDialog.svelte";
 	import {
 		IssueListView,
 		isIssueListViewMode,
@@ -106,12 +104,6 @@
 	let authCodeSent = $state(false);
 	let isSigningIn = $state(false);
 	let searchOpen = $state(false);
-	let saveAccountOpen = $state(false);
-	let saveAccountEmail = $state("");
-	let saveAccountCode = $state("");
-	let saveAccountCodeSent = $state(false);
-	let saveAccountError = $state<string | null>(null);
-	let isSavingAccount = $state(false);
 	let addingIssueIds = $state<number[]>([]);
 	let createListOpen = $state(false);
 	let createListName = $state("");
@@ -208,11 +200,6 @@
 
 	function openSearch() {
 		searchOpen = true;
-	}
-
-	function openSaveAccount() {
-		saveAccountError = null;
-		saveAccountOpen = true;
 	}
 
 	function openCreateList() {
@@ -325,12 +312,6 @@
 		}
 	}
 
-	function backToSaveAccountEmail() {
-		saveAccountCode = "";
-		saveAccountCodeSent = false;
-		saveAccountError = null;
-	}
-
 	function backToAuthEmail() {
 		authCode = "";
 		authCodeSent = false;
@@ -429,61 +410,6 @@
 		}
 	}
 
-	async function sendSaveAccountCode() {
-		const trimmedEmail = saveAccountEmail.trim();
-		saveAccountError = null;
-
-		if (!trimmedEmail) {
-			saveAccountError = "Enter an email address.";
-			return;
-		}
-
-		isSavingAccount = true;
-
-		try {
-			await db.auth.sendMagicCode({ email: trimmedEmail });
-			saveAccountEmail = trimmedEmail;
-			saveAccountCode = "";
-			saveAccountCodeSent = true;
-		} catch (error) {
-			saveAccountError =
-				error instanceof Error
-					? error.message
-					: "Unable to send a sign-in code.";
-		} finally {
-			isSavingAccount = false;
-		}
-	}
-
-	async function saveGuestAccount() {
-		const trimmedCode = saveAccountCode.trim();
-		saveAccountError = null;
-
-		if (!trimmedCode) {
-			saveAccountError = "Enter the code from your email.";
-			return;
-		}
-
-		isSavingAccount = true;
-
-		try {
-			await db.auth.signInWithMagicCode({
-				email: saveAccountEmail,
-				code: trimmedCode,
-			});
-			saveAccountOpen = false;
-			saveAccountEmail = "";
-			saveAccountCode = "";
-			saveAccountCodeSent = false;
-		} catch (error) {
-			saveAccountError =
-				error instanceof Error ? error.message : "Unable to save this account.";
-			saveAccountCode = "";
-		} finally {
-			isSavingAccount = false;
-		}
-	}
-
 	async function addIssue(issue: SearchIssue) {
 		if (isInCollection(issue) || addingIssueIds.includes(issue.id)) {
 			return true;
@@ -528,16 +454,11 @@
 
 <svelte:document onkeydown={handleGlobalKeydown} />
 
-<main class="min-h-screen bg-background text-foreground">
+<main>
 	<section
 		class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10"
 	>
-		<AppHeader
-			isGuest={Boolean(auth.user?.isGuest)}
-			signedIn={Boolean(auth.user)}
-			onSaveAccount={openSaveAccount}
-			onSignOut={() => db.auth.signOut()}
-		/>
+		<h1 class="sr-only">Longbox</h1>
 
 		{#if auth.isLoading}
 			<div
@@ -567,20 +488,6 @@
 				onAddIssue={addIssue}
 				search={comicSearch}
 			/>
-
-			{#if auth.user?.isGuest}
-				<SaveAccountDialog
-					bind:code={saveAccountCode}
-					bind:email={saveAccountEmail}
-					bind:open={saveAccountOpen}
-					codeSent={saveAccountCodeSent}
-					errorMessage={saveAccountError}
-					isSubmitting={isSavingAccount}
-					onBackToEmail={backToSaveAccountEmail}
-					onSubmitCode={saveGuestAccount}
-					onSubmitEmail={sendSaveAccountCode}
-				/>
-			{/if}
 
 			<CreateListDialog
 				errorMessage={createListError}

@@ -469,7 +469,7 @@
 
 <svelte:document onkeydown={handleKeydown} />
 
-<main class="min-h-screen bg-background text-foreground">
+<main>
 	<section class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
 		<header class="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
 			<div class="min-w-0">

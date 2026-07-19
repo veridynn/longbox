@@ -18,6 +18,17 @@ function renderHeader(isGuest: boolean) {
 }
 
 describe('AppHeader account menu', () => {
+	it('links the supplied logo to the collection', async () => {
+		renderHeader(false);
+
+		const brand = page.getByRole('link', { name: 'Longbox' });
+		await expect.element(brand).toHaveAttribute('href', '/');
+
+		const logo = brand.element().querySelector('img');
+		expect(logo?.getAttribute('src')).toContain('longbox-logo');
+		expect(logo?.getAttribute('alt')).toBe('');
+	});
+
 	it('shows guest actions and calls their handlers', async () => {
 		const { onSaveAccount, onSignOut } = renderHeader(true);
 
