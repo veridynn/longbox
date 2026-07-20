@@ -161,7 +161,6 @@ describe('importComicVineIssue', () => {
 				namespace: 'userListItems',
 				payload: {
 					addedAt: expect.any(Date),
-					listItemKey: 'user-1:custom:list-1:userIssue:user-1:comicvine:123',
 					position: 0
 				}
 			}

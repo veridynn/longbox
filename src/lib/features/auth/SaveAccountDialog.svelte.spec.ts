@@ -8,17 +8,12 @@ vi.mock('$app/navigation', () => ({ onNavigate: vi.fn() }));
 
 function renderDialog(overrides: Record<string, unknown> = {}) {
 	const callbacks = {
-		onBackToEmail: vi.fn(),
-		onEmailBlur: vi.fn(),
+		onCheckEmail: vi.fn(),
 		onEmailChange: vi.fn(),
-		onSubmitCode: vi.fn(),
-		onSubmitEmail: vi.fn(),
-		onSubmitProfile: vi.fn()
+		onSubmitEmail: vi.fn()
 	};
 
 	render(SaveAccountDialog, {
-		code: '',
-		codeSent: false,
 		email: '',
 		emailAvailability: 'idle',
 		errorMessage: null,
@@ -27,7 +22,6 @@ function renderDialog(overrides: Record<string, unknown> = {}) {
 		name: 'Guest Reader',
 		open: true,
 		profileImageSrc: 'https://example.com/avatar.jpg',
-		profilePending: false,
 		removeImage: false,
 		...callbacks,
 		...overrides
@@ -40,6 +34,11 @@ describe('SaveAccountDialog', () => {
 	it('prefills required profile data and keeps the picture optional', async () => {
 		renderDialog();
 
+		await expect
+			.element(
+				page.getByText('A display name and email are required. Your profile picture is optional.')
+			)
+			.toBeInTheDocument();
 		await expect.element(page.getByLabelText('Display name')).toHaveValue('Guest Reader');
 		await expect.element(page.getByAltText('Profile picture preview')).toBeInTheDocument();
 		await page.getByLabelText('Display name').fill('');
@@ -56,52 +55,37 @@ describe('SaveAccountDialog', () => {
 		expect(document.activeElement).not.toBe(page.getByLabelText('Display name').element());
 	});
 
-	it('checks availability on blur and blocks unavailable email', async () => {
+	it('blocks an unavailable email', async () => {
 		const callbacks = renderDialog({ emailAvailability: 'unavailable' });
 
 		await page.getByLabelText('Email').fill('used@example.com');
-		page
-			.getByLabelText('Email')
-			.element()
-			.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
 
 		expect(callbacks.onEmailChange).toHaveBeenCalled();
-		expect(callbacks.onEmailBlur).toHaveBeenCalledOnce();
 		await expect.element(page.getByText('This email is already registered.')).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: 'Send code' })).toBeDisabled();
 	});
 
-	it('preserves profile controls through code verification', async () => {
+	it('debounces availability checks for valid emails only', async () => {
+		const callbacks = renderDialog();
+		const email = page.getByLabelText('Email');
+
+		await email.fill('not-an-email');
+		await new Promise((resolve) => setTimeout(resolve, 450));
+		expect(callbacks.onCheckEmail).not.toHaveBeenCalled();
+
+		await email.fill('reader@example.com');
+		await vi.waitFor(() => expect(callbacks.onCheckEmail).toHaveBeenCalledOnce());
+	});
+
+	it('submits the profile and email setup before confirmation', async () => {
 		const callbacks = renderDialog({
-			codeSent: true,
 			email: 'reader@example.com',
 			emailAvailability: 'available'
 		});
 
-		await expect.element(page.getByLabelText('Display name')).toHaveValue('Guest Reader');
-		await expect.element(page.getByLabelText('Upload profile picture')).toBeInTheDocument();
-		await page.getByLabelText('Verification code').fill('123456');
-		await page.getByRole('button', { name: 'Save account' }).click();
+		await page.getByRole('button', { name: 'Send code' }).click();
 
-		expect(callbacks.onSubmitCode).toHaveBeenCalledOnce();
-	});
-
-	it('keeps verified setup mounted for profile retry', async () => {
-		const callbacks = renderDialog({
-			email: 'reader@example.com',
-			errorMessage: 'Unable to save your profile.',
-			profilePending: true
-		});
-
-		await expect
-			.element(
-				page.getByText('Your email is verified. Finish saving your profile to complete setup.')
-			)
-			.toBeInTheDocument();
-		await expect.element(page.getByRole('alert')).toHaveTextContent('Unable to save your profile.');
-		await page.getByRole('button', { name: 'Finish setup' }).click();
-
-		expect(callbacks.onSubmitProfile).toHaveBeenCalledOnce();
+		expect(callbacks.onSubmitEmail).toHaveBeenCalledOnce();
 	});
 
 	it('allows removing the optional profile picture', async () => {

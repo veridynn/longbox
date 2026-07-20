@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
@@ -7,61 +8,54 @@
 	import ProfileImageField from '$lib/features/main-page/ProfileImageField.svelte';
 
 	type EmailAvailability = 'idle' | 'checking' | 'available' | 'unavailable';
-	type Step = 'email' | 'code' | 'profile';
 
 	type Props = {
-		code: string;
-		codeSent: boolean;
 		email: string;
 		emailAvailability: EmailAvailability;
 		errorMessage: string | null;
 		imageFile: File | null;
 		isSubmitting: boolean;
 		name: string;
-		onBackToEmail: () => void;
-		onEmailBlur: () => void;
+		onCheckEmail: () => void;
 		onEmailChange: () => void;
-		onSubmitCode: () => void;
 		onSubmitEmail: () => void;
-		onSubmitProfile: () => void;
 		open: boolean;
 		profileImageSrc: string;
-		profilePending: boolean;
 		removeImage: boolean;
 	};
 
 	let {
-		code = $bindable(),
-		codeSent,
 		email = $bindable(),
 		emailAvailability,
 		errorMessage,
 		imageFile = $bindable(),
 		isSubmitting,
 		name = $bindable(),
-		onBackToEmail,
-		onEmailBlur,
+		onCheckEmail,
 		onEmailChange,
-		onSubmitCode,
 		onSubmitEmail,
-		onSubmitProfile,
 		open = $bindable(),
 		profileImageSrc = $bindable(),
-		profilePending,
 		removeImage = $bindable()
 	}: Props = $props();
 
-	let step = $derived((profilePending ? 'profile' : codeSent ? 'code' : 'email') as Step);
+	let emailCheckTimeout: ReturnType<typeof setTimeout>;
 	let missingName = $derived(!name.trim());
+
+	function handleEmailInput(event: Event) {
+		onEmailChange();
+		clearTimeout(emailCheckTimeout);
+		if (!(event.currentTarget as HTMLInputElement).validity.valid) return;
+		emailCheckTimeout = setTimeout(onCheckEmail, 400);
+	}
 
 	function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (missingName || isSubmitting) return;
-
-		if (step === 'email') onSubmitEmail();
-		else if (step === 'code') onSubmitCode();
-		else onSubmitProfile();
+		onSubmitEmail();
 	}
+
+	onDestroy(() => clearTimeout(emailCheckTimeout));
 </script>
 
 <Dialog.Root bind:open>
@@ -69,7 +63,7 @@
 		<Dialog.Header>
 			<Dialog.Title>Save account</Dialog.Title>
 			<Dialog.Description>
-				Add your profile and email so you can sign in again later.
+				A display name and email are required. Your profile picture is optional.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -96,69 +90,41 @@
 					/>
 				</Field.Field>
 
-				{#if step === 'email'}
-					<Field.Field data-invalid={emailAvailability === 'unavailable'}>
-						<Field.Label for="save-account-email">Email</Field.Label>
-						<Input
-							id="save-account-email"
-							bind:value={email}
-							autocomplete="email"
-							disabled={isSubmitting}
-							placeholder="you@example.com"
-							required
-							type="email"
-							onblur={onEmailBlur}
-							oninput={onEmailChange}
-						/>
-						{#if emailAvailability === 'checking'}
-							<Field.Description>Checking email availability…</Field.Description>
-						{:else if emailAvailability === 'available'}
-							<Field.Description>This email is available.</Field.Description>
-						{:else if emailAvailability === 'unavailable'}
-							<Field.Error>This email is already registered.</Field.Error>
-						{/if}
-					</Field.Field>
-				{:else if step === 'code'}
-					<Field.Field>
-						<Field.Label for="save-account-code">Verification code</Field.Label>
-						<Field.Description>
-							Enter the code sent to <span class="font-medium text-foreground">{email}</span>.
-						</Field.Description>
-						<Input
-							id="save-account-code"
-							bind:value={code}
-							autocomplete="one-time-code"
-							disabled={isSubmitting}
-							inputmode="numeric"
-							placeholder="123456"
-							required
-						/>
-					</Field.Field>
-				{:else}
-					<Field.Description>
-						Your email is verified. Finish saving your profile to complete setup.
-					</Field.Description>
-				{/if}
+				<Field.Field data-invalid={emailAvailability === 'unavailable'}>
+					<Field.Label for="save-account-email">Email</Field.Label>
+					<Input
+						id="save-account-email"
+						bind:value={email}
+						autocomplete="email"
+						disabled={isSubmitting}
+						placeholder="you@example.com"
+						required
+						type="email"
+						oninput={handleEmailInput}
+					/>
+					{#if emailAvailability === 'checking'}
+						<Field.Description>Checking email availability…</Field.Description>
+					{:else if emailAvailability === 'available'}
+						<Field.Description>This email is available.</Field.Description>
+					{:else if emailAvailability === 'unavailable'}
+						<Field.Error>This email is already registered.</Field.Error>
+					{/if}
+				</Field.Field>
 
 				{#if errorMessage}
 					<p class="text-sm text-destructive" role="alert">{errorMessage}</p>
 				{/if}
 
 				<Field.Field orientation="horizontal" class="justify-end">
-					{#if step === 'code'}
-						<Button type="button" variant="outline" disabled={isSubmitting} onclick={onBackToEmail}>
-							Change email
-						</Button>
-					{/if}
 					<Button
 						type="submit"
 						disabled={missingName ||
 							isSubmitting ||
 							emailAvailability === 'checking' ||
-							(step === 'email' && emailAvailability === 'unavailable')}
+							emailAvailability === 'unavailable'}
 					>
 						{#if isSubmitting}<Spinner data-icon="inline-start" />{/if}
-						{step === 'email' ? 'Send code' : step === 'code' ? 'Save account' : 'Finish setup'}
+						Send code
 					</Button>
 				</Field.Field>
 			</Field.Group>

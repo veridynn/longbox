@@ -44,16 +44,16 @@ describe('AppHeader account menu', () => {
 		const { onOpenAccount, onOpenProfile, onSaveAccount, onSignOut } = renderHeader(true);
 
 		await page.getByRole('button', { name: 'Open account menu' }).click();
-		await page.getByRole('menuitem', { name: 'Profile', exact: true }).click();
-		expect(onOpenProfile).toHaveBeenCalledOnce();
-
-		await page.getByRole('button', { name: 'Open account menu' }).click();
-		await page.getByRole('menuitem', { name: 'Account', exact: true }).click();
-		expect(onOpenAccount).toHaveBeenCalledOnce();
-
-		await page.getByRole('button', { name: 'Open account menu' }).click();
+		await expect
+			.element(page.getByRole('menuitem', { name: 'Profile', exact: true }))
+			.not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('menuitem', { name: 'Account', exact: true }))
+			.not.toBeInTheDocument();
 		await page.getByRole('menuitem', { name: 'Save account' }).click();
 		expect(onSaveAccount).toHaveBeenCalledOnce();
+		expect(onOpenProfile).not.toHaveBeenCalled();
+		expect(onOpenAccount).not.toHaveBeenCalled();
 
 		await page.getByRole('button', { name: 'Open account menu' }).click();
 		await page.getByRole('menuitem', { name: 'Sign out' }).click();

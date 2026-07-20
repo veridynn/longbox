@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onNavigate } from '$app/navigation';
+	import { goto, onNavigate } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { flushSync } from 'svelte';
 	import './layout.css';
@@ -11,6 +12,7 @@
 		markIssueTransitionIncoming
 	} from '$lib/comics/view-transitions.svelte.ts';
 	import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
+	import SaveAccountConfirmationDialog from '$lib/features/auth/SaveAccountConfirmationDialog.svelte';
 	import SaveAccountDialog from '$lib/features/auth/SaveAccountDialog.svelte';
 	import AccountDialog from '$lib/features/main-page/AccountDialog.svelte';
 	import AppHeader from '$lib/features/main-page/AppHeader.svelte';
@@ -65,9 +67,9 @@
 	let profileError = $state<string | null>(null);
 	let isSavingProfile = $state(false);
 	let saveAccountOpen = $state(false);
+	let saveAccountConfirmationOpen = $state(false);
 	let saveAccountEmail = $state('');
 	let saveAccountCode = $state('');
-	let saveAccountCodeSent = $state(false);
 	let saveAccountError = $state<string | null>(null);
 	let saveAccountEmailAvailability = $state<
 		'idle' | 'checking' | 'available' | 'unavailable'
@@ -146,7 +148,7 @@
 		saveAccountProfileImageRemoved = false;
 		saveAccountEmail = '';
 		saveAccountCode = '';
-		saveAccountCodeSent = false;
+		saveAccountConfirmationOpen = false;
 		saveAccountError = null;
 		saveAccountEmailAvailability = 'idle';
 		saveAccountVerifiedUserId = null;
@@ -164,6 +166,11 @@
 
 	function cancelDeleteAccount() {
 		deleteAccountError = null;
+	}
+
+	async function signOut(options?: Parameters<typeof db.auth.signOut>[0]) {
+		await db.auth.signOut(options);
+		await goto(resolve('/'));
 	}
 
 	function openProfile() {
@@ -270,7 +277,7 @@
 
 			deleteAccountOpen = false;
 			accountOpen = false;
-			await db.auth.signOut({ invalidateToken: false });
+			await signOut({ invalidateToken: false });
 		} catch (error) {
 			deleteAccountError =
 				error instanceof Error ? error.message : 'Unable to delete this account.';
@@ -281,9 +288,10 @@
 
 	function backToSaveAccountEmail() {
 		saveAccountCode = '';
-		saveAccountCodeSent = false;
 		saveAccountError = null;
 		saveAccountEmailAvailability = 'idle';
+		saveAccountConfirmationOpen = false;
+		saveAccountOpen = true;
 	}
 
 	function handleSaveAccountEmailChange() {
@@ -355,7 +363,7 @@
 		try {
 			await db.auth.sendMagicCode({ email: saveAccountEmail });
 			saveAccountCode = '';
-			saveAccountCodeSent = true;
+			saveAccountConfirmationOpen = true;
 		} catch (error) {
 			saveAccountError =
 				error instanceof Error ? error.message : 'Unable to send a sign-in code.';
@@ -379,7 +387,14 @@
 			return;
 		}
 
-		if (!guestUserId || !(await checkSaveAccountEmail())) return;
+		if (!guestUserId) return;
+
+		if (!(await checkSaveAccountEmail())) {
+			if (saveAccountEmailAvailability === 'unavailable') {
+				saveAccountError = 'This email is already registered.';
+			}
+			return;
+		}
 
 		isSavingAccount = true;
 
@@ -413,9 +428,9 @@
 				removeImage: saveAccountProfileImageRemoved
 			});
 			saveAccountOpen = false;
+			saveAccountConfirmationOpen = false;
 			saveAccountEmail = '';
 			saveAccountCode = '';
-			saveAccountCodeSent = false;
 			saveAccountVerifiedUserId = null;
 		} catch (error) {
 			saveAccountError =
@@ -459,7 +474,7 @@
 		onSaveAccount={openSaveAccount}
 		profileImageSrc={headerProfileImageSrc}
 		profileName={currentProfile?.name ?? ''}
-		onSignOut={() => db.auth.signOut()}
+		onSignOut={signOut}
 	/>
 	<div class="flex-1">
 		{@render children()}
@@ -497,24 +512,32 @@
 {/if}
 
 <!-- TODO: Plan and implement monthly cleanup for guest accounts older than one month. -->
-{#if auth.user?.isGuest || saveAccountOpen}
+{#if auth.user?.isGuest}
 	<SaveAccountDialog
-		bind:code={saveAccountCode}
 		bind:email={saveAccountEmail}
 		bind:imageFile={saveAccountProfileImageFile}
 		bind:name={saveAccountName}
 		bind:open={saveAccountOpen}
 		bind:profileImageSrc={saveAccountProfileImageSrc}
 		bind:removeImage={saveAccountProfileImageRemoved}
-		codeSent={saveAccountCodeSent}
 		emailAvailability={saveAccountEmailAvailability}
 		errorMessage={saveAccountError}
 		isSubmitting={isSavingAccount}
-		onBackToEmail={backToSaveAccountEmail}
-		onEmailBlur={checkSaveAccountEmail}
+		onCheckEmail={checkSaveAccountEmail}
 		onEmailChange={handleSaveAccountEmailChange}
-		onSubmitCode={saveGuestAccount}
 		onSubmitEmail={sendSaveAccountCode}
+	/>
+{/if}
+{#if saveAccountConfirmationOpen}
+	<SaveAccountConfirmationDialog
+		bind:code={saveAccountCode}
+		bind:open={saveAccountConfirmationOpen}
+		email={saveAccountEmail}
+		errorMessage={saveAccountError}
+		isSubmitting={isSavingAccount}
+		onBackToEmail={backToSaveAccountEmail}
+		onResendCode={sendSaveAccountCode}
+		onSubmitCode={saveGuestAccount}
 		onSubmitProfile={finishGuestAccountProfile}
 		profilePending={Boolean(saveAccountVerifiedUserId)}
 	/>

@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { LoaderCircle, Mail, ShieldCheck } from '@lucide/svelte';
+	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as Field from '$lib/components/ui/field/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import * as InputOTP from '$lib/components/ui/input-otp/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
 	type Props = {
 		code: string;
@@ -10,7 +15,7 @@
 		onBackToEmail: () => void;
 		onSignInAsGuest: () => void;
 		onSubmitCode: () => void;
-		onSubmitEmail: () => void;
+		onSubmitEmail: () => void | Promise<void>;
 	};
 
 	let {
@@ -24,6 +29,8 @@
 		onSubmitCode,
 		onSubmitEmail
 	}: Props = $props();
+	let isResending = $state(false);
+	let isCodeComplete = $derived(code.length === 6);
 
 	function handleEmailSubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -32,121 +39,134 @@
 
 	function handleCodeSubmit(event: SubmitEvent) {
 		event.preventDefault();
+		if (!isCodeComplete || isSigningIn) return;
 		onSubmitCode();
+	}
+
+	async function resendCode() {
+		if (isSigningIn) return;
+		isResending = true;
+		try {
+			await onSubmitEmail();
+		} finally {
+			isResending = false;
+		}
 	}
 </script>
 
-<div class="grid min-h-96 place-items-center">
-	<div class="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-sm">
-		<h2 class="text-xl font-semibold">Open your collection</h2>
-		<p class="mt-2 text-sm leading-6 text-muted-foreground">
-			Sign in with the email you saved, or continue as a guest.
-		</p>
+<div class="grid min-h-[28rem] place-items-center">
+	<section class="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+		<header class="flex flex-col gap-2 text-center">
+			<h2 class="text-xl font-semibold">
+				{codeSent ? 'Check your email' : 'Sign in to Longbox'}
+			</h2>
+			<p class="text-sm leading-6 text-muted-foreground">
+				{#if codeSent}
+					We sent a 6-digit sign-in code to
+					<span class="font-medium text-foreground">{email}</span>.
+				{:else}
+					Enter your email to receive a one-time sign-in code.
+				{/if}
+			</p>
+		</header>
 
 		{#if codeSent}
-			<form class="mt-5 grid gap-4" onsubmit={handleCodeSubmit}>
-				<p class="text-sm leading-6 text-muted-foreground">
-					Enter the code sent to <span class="font-medium text-foreground">{email}</span>.
-				</p>
-				<div class="grid gap-2">
-					<label class="text-sm font-medium" for="auth-code">Code</label>
-					<div class="relative">
-						<ShieldCheck
-							class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-						/>
-						<input
-							id="auth-code"
+			<form class="mt-6" onsubmit={handleCodeSubmit}>
+				<Field.Group>
+					<Field.Field data-invalid={Boolean(authError)} class="items-center">
+						<InputOTP.Root
+							aria-label="Verification code"
+							aria-invalid={Boolean(authError)}
+							inputId="auth-code"
 							bind:value={code}
-							class="h-10 w-full rounded-md border border-input bg-input/30 pr-3 pl-9 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+							class="justify-center"
 							disabled={isSigningIn}
-							inputmode="numeric"
-							placeholder="123456"
+							maxlength={6}
+							pattern={REGEXP_ONLY_DIGITS}
 							required
-						/>
-					</div>
-				</div>
-				<div class="flex flex-wrap justify-end gap-2">
-					<button
+						>
+							{#snippet children({ cells })}
+								<InputOTP.Group
+									class="gap-2 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border"
+								>
+									{#each cells as cell (cell)}
+										<InputOTP.Slot {cell} />
+									{/each}
+								</InputOTP.Group>
+							{/snippet}
+						</InputOTP.Root>
+					</Field.Field>
+
+					<Button type="submit" size="lg" class="w-full" disabled={!isCodeComplete || isSigningIn}>
+						{#if isSigningIn && !isResending}<Spinner data-icon="inline-start" />{/if}
+						Verify code
+					</Button>
+
+					<Field.Field orientation="horizontal" class="justify-center gap-1">
+						<span class="text-sm text-muted-foreground">Didn't receive the code?</span>
+						<Button
+							type="button"
+							variant="link"
+							size="xs"
+							disabled={isSigningIn}
+							onclick={resendCode}
+						>
+							{#if isResending}<Spinner data-icon="inline-start" />{/if}
+							Resend code
+						</Button>
+					</Field.Field>
+
+					<Button
 						type="button"
-						class="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+						variant="ghost"
+						class="self-center"
 						disabled={isSigningIn}
 						onclick={onBackToEmail}
 					>
-						Change email
-					</button>
-					<button
-						type="submit"
-						class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-						disabled={isSigningIn}
-					>
-						{#if isSigningIn}
-							<LoaderCircle class="size-4 animate-spin" />
-						{:else}
-							<ShieldCheck class="size-4" />
-						{/if}
-						Sign in
-					</button>
-				</div>
+						Use a different email
+					</Button>
+				</Field.Group>
 			</form>
 		{:else}
-			<form class="mt-5 grid gap-4" onsubmit={handleEmailSubmit}>
-				<div class="grid gap-2">
-					<label class="text-sm font-medium" for="auth-email">Email</label>
-					<div class="relative">
-						<Mail
-							class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-						/>
-						<input
+			<form class="mt-6" onsubmit={handleEmailSubmit}>
+				<Field.Group>
+					<Field.Field data-invalid={Boolean(authError)}>
+						<Field.Label for="auth-email">Email</Field.Label>
+						<Input
 							id="auth-email"
 							bind:value={email}
-							class="h-10 w-full rounded-md border border-input bg-input/30 pr-3 pl-9 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+							aria-invalid={Boolean(authError)}
+							autocomplete="email"
 							disabled={isSigningIn}
 							placeholder="you@example.com"
 							required
 							type="email"
 						/>
-					</div>
-				</div>
-				<button
-					type="submit"
-					class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-					disabled={isSigningIn}
-				>
-					{#if isSigningIn}
-						<LoaderCircle class="size-4 animate-spin" />
-					{:else}
-						<Mail class="size-4" />
-					{/if}
-					Send sign-in code
-				</button>
+					</Field.Field>
+
+					<Button type="submit" size="lg" class="w-full" disabled={isSigningIn}>
+						{#if isSigningIn}<Spinner data-icon="inline-start" />{/if}
+						Continue with email
+					</Button>
+
+					<Field.Separator>or</Field.Separator>
+
+					<Button
+						type="button"
+						variant="outline"
+						size="lg"
+						class="w-full"
+						disabled={isSigningIn}
+						onclick={onSignInAsGuest}
+					>
+						Continue as guest
+					</Button>
+				</Field.Group>
 			</form>
 		{/if}
 
-		<div class="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-			<div class="h-px flex-1 bg-border"></div>
-			<span>or</span>
-			<div class="h-px flex-1 bg-border"></div>
-		</div>
-
-		<button
-			type="button"
-			class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-			disabled={isSigningIn}
-			onclick={onSignInAsGuest}
-		>
-			{#if isSigningIn}
-				<LoaderCircle class="size-4 animate-spin" />
-				Signing in
-			{:else}
-				Continue as guest
-			{/if}
-		</button>
 		{#if authError}
-			<p
-				class="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-			>
-				{authError}
-			</p>
+			<p class="mt-5 text-center text-sm text-destructive" role="alert">{authError}</p>
 		{/if}
-	</div>
+	</section>
 </div>

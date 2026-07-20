@@ -65,21 +65,22 @@
 							<p class="truncate">{profileName || (isGuest ? 'Guest' : 'Account')}</p>
 						</DropdownMenu.Label>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Group>
-							<DropdownMenu.Item onSelect={onOpenProfile}>
-								<UserRound />
-								Profile
-							</DropdownMenu.Item>
-							<DropdownMenu.Item onSelect={onOpenAccount}>
-								<Settings />
-								Account
-							</DropdownMenu.Item>
-						</DropdownMenu.Group>
 						{#if isGuest}
 							<DropdownMenu.Group>
 								<DropdownMenu.Item onSelect={onSaveAccount}>
 									<Save />
 									Save account
+								</DropdownMenu.Item>
+							</DropdownMenu.Group>
+						{:else}
+							<DropdownMenu.Group>
+								<DropdownMenu.Item onSelect={onOpenProfile}>
+									<UserRound />
+									Profile
+								</DropdownMenu.Item>
+								<DropdownMenu.Item onSelect={onOpenAccount}>
+									<Settings />
+									Account
 								</DropdownMenu.Item>
 							</DropdownMenu.Group>
 						{/if}

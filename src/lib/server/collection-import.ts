@@ -103,7 +103,6 @@ async function addUserIssueKeyToList(list: TargetList, userIssueKeyValue: string
 		adminDb.tx.userListItems[lookup('listItemKey', stableListItemKey)]
 			.update({
 				addedAt: new Date(),
-				listItemKey: stableListItemKey,
 				position: list.items?.length ?? 0
 			})
 			.link({
