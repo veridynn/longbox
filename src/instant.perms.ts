@@ -46,6 +46,15 @@ const rules = {
 			update: 'auth.id != null && auth.id == data.id'
 		}
 	},
+	$files: {
+		bind: ['isOwner', "auth.id != null && data.path.startsWith(auth.id + '/')"],
+		allow: {
+			view: 'isOwner',
+			create: 'isOwner',
+			delete: 'isOwner',
+			update: 'isOwner'
+		}
+	},
 	userLists: {
 		allow: {
 			view: "auth.id != null && auth.id in data.ref('owner.id')",
@@ -60,8 +69,7 @@ const rules = {
 			view: "auth.id != null && auth.id in data.ref('user.id')",
 			create: "auth.id != null && auth.id in data.ref('user.id')",
 			delete: "auth.id != null && auth.id in data.ref('user.id')",
-			update:
-				"auth.id != null && auth.id in data.ref('user.id') && auth.id != null && auth.id in newData.ref('user.id')"
+			update: "auth.id != null && auth.id in data.ref('user.id')"
 		}
 	},
 	characters: {

@@ -86,7 +86,7 @@
 		this={tagName as never}
 		{id}
 		data-mode="view"
-		class={cn(commonClass, className, textClass)}
+		class={cn(commonClass, 'cursor-pointer', className, textClass)}
 		onclick={renameState.onTextClick}
 	>
 		{value}

@@ -3,8 +3,28 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { cleanup, render } from 'vitest-browser-svelte';
 import { ConfirmDeleteDialog, confirmDelete } from '.';
 
+const navigation = vi.hoisted(() => ({ callbacks: [] as Array<() => void> }));
+vi.mock('$app/navigation', () => ({
+	onNavigate: (callback: () => void) => navigation.callbacks.push(callback)
+}));
+
 describe('ConfirmDeleteDialog', () => {
 	afterEach(cleanup);
+
+	it('unmounts its content when navigation starts', async () => {
+		render(ConfirmDeleteDialog);
+		confirmDelete({
+			title: 'Delete list',
+			description: 'This action cannot be undone.',
+			onConfirm: vi.fn()
+		});
+
+		navigation.callbacks.at(-1)?.();
+
+		await expect
+			.element(page.getByRole('heading', { name: 'Delete list' }))
+			.not.toBeInTheDocument();
+	});
 
 	it('requires the configured text before deleting', async () => {
 		const onConfirm = vi.fn().mockResolvedValue(undefined);

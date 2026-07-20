@@ -130,6 +130,31 @@
 	}
 }
 
+button:not(:disabled),
+a[href],
+select:not(:disabled),
+summary,
+input:is(
+		[type='button'],
+		[type='submit'],
+		[type='reset'],
+		[type='checkbox'],
+		[type='radio'],
+		[type='file']
+	):not(:disabled),
+[role='button']:not([aria-disabled='true']):not([data-disabled]),
+[role='link']:not([aria-disabled='true']):not([data-disabled]),
+[role^='menuitem']:not([aria-disabled='true']):not([data-disabled]),
+[role='option']:not([aria-disabled='true']):not([data-disabled]),
+[role='tab']:not([aria-disabled='true']):not([data-disabled]),
+[role='switch']:not([aria-disabled='true']):not([data-disabled]),
+[role='checkbox']:not([aria-disabled='true']):not([data-disabled]),
+[role='radio']:not([aria-disabled='true']):not([data-disabled]),
+[role='slider']:not([aria-disabled='true']):not([data-disabled]),
+[role='treeitem']:not([aria-disabled='true']):not([data-disabled]) {
+	cursor: pointer;
+}
+
 @keyframes issue-page-fade-in {
 	from {
 		opacity: 0;

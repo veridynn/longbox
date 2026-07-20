@@ -1,18 +1,30 @@
 <script lang="ts">
-	import { LogOut, Save, UserRound } from '@lucide/svelte';
-	import { resolve } from '$app/paths';
+	import { LogOut, Save, Settings, UserRound } from '@lucide/svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import logo from '$lib/assets/longbox-logo.svg';
 
 	type Props = {
 		isGuest: boolean;
+		onOpenAccount: () => void;
+		onOpenProfile: () => void;
 		onSaveAccount: () => void;
+		profileImageSrc: string;
+		profileName: string;
 		signedIn: boolean;
 		onSignOut: () => void;
 	};
 
-	let { isGuest, onSaveAccount, signedIn, onSignOut }: Props = $props();
+	let {
+		isGuest,
+		onOpenAccount,
+		onOpenProfile,
+		onSaveAccount,
+		profileImageSrc,
+		profileName,
+		signedIn,
+		onSignOut
+	}: Props = $props();
 </script>
 
 <header
@@ -21,10 +33,10 @@
 	<div
 		class="mx-auto flex w-full max-w-7xl items-center justify-between gap-5 px-5 py-4 sm:px-8 lg:px-10"
 	>
-		<a class="flex items-center gap-3" href={resolve('/')}>
+		<div class="flex items-center gap-3">
 			<img class="size-11 rounded-md" src={logo} alt="" />
 			<span class="text-2xl font-semibold tracking-normal">Longbox</span>
-		</a>
+		</div>
 
 		{#if signedIn}
 			<div class="flex flex-wrap items-center gap-2">
@@ -33,13 +45,36 @@
 						aria-label="Open account menu"
 						class="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
 					>
+					{#key Boolean(profileImageSrc)}
 						<Avatar.Root size="lg">
+							{#if profileImageSrc}
+								<Avatar.Image src={profileImageSrc} alt={profileName || 'Profile picture'} />
+							{/if}
 							<Avatar.Fallback>
-								<UserRound class="size-5" />
+								<img
+									src={logo}
+									alt="Longbox logo"
+									class="size-full rounded-full object-cover grayscale opacity-50"
+								/>
 							</Avatar.Fallback>
 						</Avatar.Root>
+					{/key}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-40" preventScroll={false}>
+					<DropdownMenu.Content align="end" class="w-56" preventScroll={false}>
+						<DropdownMenu.Label>
+							<p class="truncate">{profileName || (isGuest ? 'Guest' : 'Account')}</p>
+						</DropdownMenu.Label>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Group>
+							<DropdownMenu.Item onSelect={onOpenProfile}>
+								<UserRound />
+								Profile
+							</DropdownMenu.Item>
+							<DropdownMenu.Item onSelect={onOpenAccount}>
+								<Settings />
+								Account
+							</DropdownMenu.Item>
+						</DropdownMenu.Group>
 						{#if isGuest}
 							<DropdownMenu.Group>
 								<DropdownMenu.Item onSelect={onSaveAccount}>
@@ -48,6 +83,7 @@
 								</DropdownMenu.Item>
 							</DropdownMenu.Group>
 						{/if}
+						<DropdownMenu.Separator />
 						<DropdownMenu.Group>
 							<DropdownMenu.Item onSelect={onSignOut}>
 								<LogOut />

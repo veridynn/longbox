@@ -21,7 +21,9 @@ describe('Rename', () => {
 			onSave
 		});
 
-		await page.getByText('To read', { exact: true }).click();
+		const value = page.getByText('To read', { exact: true });
+		await expect.element(value).toHaveClass('cursor-pointer');
+		await value.click();
 		await page.getByRole('textbox').fill('   ');
 		pressEnter();
 		expect(onSave).not.toHaveBeenCalled();

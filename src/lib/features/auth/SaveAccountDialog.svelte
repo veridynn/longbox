@@ -1,153 +1,167 @@
 <script lang="ts">
-	import { LoaderCircle, Mail, ShieldCheck } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as Field from '$lib/components/ui/field/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import ProfileImageField from '$lib/features/main-page/ProfileImageField.svelte';
 
-	type Step = 'email' | 'code';
+	type EmailAvailability = 'idle' | 'checking' | 'available' | 'unavailable';
+	type Step = 'email' | 'code' | 'profile';
 
 	type Props = {
 		code: string;
 		codeSent: boolean;
 		email: string;
+		emailAvailability: EmailAvailability;
 		errorMessage: string | null;
+		imageFile: File | null;
 		isSubmitting: boolean;
+		name: string;
 		onBackToEmail: () => void;
+		onEmailBlur: () => void;
+		onEmailChange: () => void;
 		onSubmitCode: () => void;
 		onSubmitEmail: () => void;
+		onSubmitProfile: () => void;
 		open: boolean;
+		profileImageSrc: string;
+		profilePending: boolean;
+		removeImage: boolean;
 	};
 
 	let {
 		code = $bindable(),
 		codeSent,
 		email = $bindable(),
+		emailAvailability,
 		errorMessage,
+		imageFile = $bindable(),
 		isSubmitting,
+		name = $bindable(),
 		onBackToEmail,
+		onEmailBlur,
+		onEmailChange,
 		onSubmitCode,
 		onSubmitEmail,
-		open = $bindable()
+		onSubmitProfile,
+		open = $bindable(),
+		profileImageSrc = $bindable(),
+		profilePending,
+		removeImage = $bindable()
 	}: Props = $props();
 
-	let step = $derived((codeSent ? 'code' : 'email') as Step);
+	let step = $derived((profilePending ? 'profile' : codeSent ? 'code' : 'email') as Step);
+	let missingName = $derived(!name.trim());
 
-	function handleEmailSubmit(event: SubmitEvent) {
+	function submit(event: SubmitEvent) {
 		event.preventDefault();
-		onSubmitEmail();
-	}
+		if (missingName || isSubmitting) return;
 
-	function handleCodeSubmit(event: SubmitEvent) {
-		event.preventDefault();
-		onSubmitCode();
+		if (step === 'email') onSubmitEmail();
+		else if (step === 'code') onSubmitCode();
+		else onSubmitProfile();
 	}
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-md">
+	<Dialog.Content class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg">
 		<Dialog.Header>
-			<Dialog.Title>Save your collection</Dialog.Title>
+			<Dialog.Title>Save account</Dialog.Title>
 			<Dialog.Description>
-				Register this guest account with an email so you can sign in again later.
+				Add your profile and email so you can sign in again later.
 			</Dialog.Description>
 		</Dialog.Header>
 
-		{#if step === 'email'}
-			<form class="grid gap-4" onsubmit={handleEmailSubmit}>
-				<div class="grid gap-2">
-					<label class="text-sm font-medium" for="save-account-email">Email</label>
-					<div class="relative">
-						<Mail
-							class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-						/>
-						<input
+		<form onsubmit={submit}>
+			<Field.Group>
+				<ProfileImageField
+					bind:imageFile
+					bind:profileImageSrc
+					bind:removeImage
+					disabled={isSubmitting}
+					inputId="save-account-image"
+					{open}
+				/>
+
+				<Field.Field>
+					<Field.Label for="save-account-name">Display name</Field.Label>
+					<Input
+						id="save-account-name"
+						bind:value={name}
+						autocomplete="name"
+						disabled={isSubmitting}
+						maxlength={80}
+						required
+					/>
+				</Field.Field>
+
+				{#if step === 'email'}
+					<Field.Field data-invalid={emailAvailability === 'unavailable'}>
+						<Field.Label for="save-account-email">Email</Field.Label>
+						<Input
 							id="save-account-email"
 							bind:value={email}
-							class="h-10 w-full rounded-md border border-input bg-input/30 pr-3 pl-9 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+							autocomplete="email"
 							disabled={isSubmitting}
 							placeholder="you@example.com"
 							required
 							type="email"
+							onblur={onEmailBlur}
+							oninput={onEmailChange}
 						/>
-					</div>
-				</div>
-
-				{#if errorMessage}
-					<p
-						class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{errorMessage}
-					</p>
-				{/if}
-
-				<div class="flex justify-end gap-2">
-					<button
-						type="submit"
-						class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-						disabled={isSubmitting}
-					>
-						{#if isSubmitting}
-							<LoaderCircle class="size-4 animate-spin" />
-						{:else}
-							<Mail class="size-4" />
+						{#if emailAvailability === 'checking'}
+							<Field.Description>Checking email availability…</Field.Description>
+						{:else if emailAvailability === 'available'}
+							<Field.Description>This email is available.</Field.Description>
+						{:else if emailAvailability === 'unavailable'}
+							<Field.Error>This email is already registered.</Field.Error>
 						{/if}
-						Send code
-					</button>
-				</div>
-			</form>
-		{:else}
-			<form class="grid gap-4" onsubmit={handleCodeSubmit}>
-				<p class="text-sm leading-6 text-muted-foreground">
-					Enter the code sent to <span class="font-medium text-foreground">{email}</span>.
-				</p>
-
-				<div class="grid gap-2">
-					<label class="text-sm font-medium" for="save-account-code">Code</label>
-					<div class="relative">
-						<ShieldCheck
-							class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-						/>
-						<input
+					</Field.Field>
+				{:else if step === 'code'}
+					<Field.Field>
+						<Field.Label for="save-account-code">Verification code</Field.Label>
+						<Field.Description>
+							Enter the code sent to <span class="font-medium text-foreground">{email}</span>.
+						</Field.Description>
+						<Input
 							id="save-account-code"
 							bind:value={code}
-							class="h-10 w-full rounded-md border border-input bg-input/30 pr-3 pl-9 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+							autocomplete="one-time-code"
 							disabled={isSubmitting}
 							inputmode="numeric"
 							placeholder="123456"
 							required
 						/>
-					</div>
-				</div>
-
-				{#if errorMessage}
-					<p
-						class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-					>
-						{errorMessage}
-					</p>
+					</Field.Field>
+				{:else}
+					<Field.Description>
+						Your email is verified. Finish saving your profile to complete setup.
+					</Field.Description>
 				{/if}
 
-				<div class="flex flex-wrap justify-end gap-2">
-					<button
-						type="button"
-						class="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-						disabled={isSubmitting}
-						onclick={onBackToEmail}
-					>
-						Change email
-					</button>
-					<button
+				{#if errorMessage}
+					<p class="text-sm text-destructive" role="alert">{errorMessage}</p>
+				{/if}
+
+				<Field.Field orientation="horizontal" class="justify-end">
+					{#if step === 'code'}
+						<Button type="button" variant="outline" disabled={isSubmitting} onclick={onBackToEmail}>
+							Change email
+						</Button>
+					{/if}
+					<Button
 						type="submit"
-						class="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
-						disabled={isSubmitting}
+						disabled={missingName ||
+							isSubmitting ||
+							emailAvailability === 'checking' ||
+							(step === 'email' && emailAvailability === 'unavailable')}
 					>
-						{#if isSubmitting}
-							<LoaderCircle class="size-4 animate-spin" />
-						{:else}
-							<ShieldCheck class="size-4" />
-						{/if}
-						Save account
-					</button>
-				</div>
-			</form>
-		{/if}
+						{#if isSubmitting}<Spinner data-icon="inline-start" />{/if}
+						{step === 'email' ? 'Send code' : step === 'code' ? 'Save account' : 'Finish setup'}
+					</Button>
+				</Field.Field>
+			</Field.Group>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

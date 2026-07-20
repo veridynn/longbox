@@ -25,7 +25,6 @@ const _schema = i.schema({
 		profiles: i.entity({
 			createdAt: i.date(),
 			name: i.string().optional(),
-			profileImageUrl: i.string().optional(),
 			updatedAt: i.date()
 		}),
 
