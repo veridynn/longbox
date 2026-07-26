@@ -1,13 +1,28 @@
 <script lang="ts">
 	import { id } from '@instantdb/svelte';
-	import { ArrowLeft, EllipsisVertical, LoaderCircle, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import {
+		ArrowLeft,
+		CircleAlert,
+		EllipsisVertical,
+		FolderX,
+		House,
+		ListPlus,
+		LoaderCircle,
+		LockKeyhole,
+		Pencil,
+		Plus,
+		RefreshCcw,
+		Trash2
+	} from '@lucide/svelte';
 	import { createSearchParamsSchema, useSearchParams } from 'runed/kit';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
 	import { ComicSearchState } from '$lib/features/search/comic-search-state.svelte';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
+	import * as Empty from '$lib/components/ui/empty';
 	import * as Rename from '$lib/components/ui/rename';
 	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
 	import {
@@ -524,7 +539,11 @@
 				</div>
 				<p class="mt-1 text-sm text-muted-foreground">{listItems.length} issues</p>
 				{#if allListsQuery.error}
-					<p class="mt-2 text-sm text-destructive">{allListsQuery.error.message}</p>
+					<Alert.Root class="mt-2" variant="destructive">
+						<CircleAlert aria-hidden="true" />
+						<Alert.Title>Couldn’t load list options</Alert.Title>
+						<Alert.Description>Reload the page before adding issues to another list.</Alert.Description>
+					</Alert.Root>
 				{/if}
 			</div>
 
@@ -552,17 +571,65 @@
 				Loading list
 			</div>
 		{:else if !auth.user}
-			<p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-				Sign in from the Collection page to view lists.
-			</p>
+			<Empty.Root class="min-h-80 border" aria-labelledby="list-sign-in-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<LockKeyhole aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h2 id="list-sign-in-title">Sign in to view this list</h2>
+					</Empty.Title>
+					<Empty.Description>
+						Return to Collection and sign in or continue as a guest.
+					</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button href="/">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else if listQuery.error}
-			<p class="rounded-lg border border-border bg-card p-6 text-sm text-destructive">
-				{listQuery.error.message}
-			</p>
+			<Empty.Root class="min-h-80 border" aria-labelledby="list-load-error-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<CircleAlert aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h2 id="list-load-error-title">Couldn’t load this list</h2>
+					</Empty.Title>
+					<Empty.Description>Check your connection and try again.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content class="sm:flex-row">
+					<Button onclick={() => window.location.reload()}>
+						<RefreshCcw data-icon="inline-start" />
+						Reload page
+					</Button>
+					<Button href="/" variant="outline">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else if !currentList}
-			<p class="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-				List not found.
-			</p>
+			<Empty.Root class="min-h-80 border" aria-labelledby="list-not-found-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<FolderX aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h2 id="list-not-found-title">List not found</h2>
+					</Empty.Title>
+					<Empty.Description>This list may have been deleted or is no longer available.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button href="/">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else}
 			{#if collectionQuery.isLoading}
 				<div class="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -570,9 +637,11 @@
 					Loading collection issues
 				</div>
 			{:else if collectionQuery.error}
-				<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-					{collectionQuery.error.message}
-				</p>
+				<Alert.Root variant="destructive">
+					<CircleAlert aria-hidden="true" />
+					<Alert.Title>Couldn’t load collection issues</Alert.Title>
+					<Alert.Description>Reload the page before adding issues from your collection.</Alert.Description>
+				</Alert.Root>
 			{:else}
 				<ComicSearchPanel
 					{addError}
@@ -591,9 +660,11 @@
 			{/if}
 
 			{#if listActionError}
-				<p class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-					{listActionError}
-				</p>
+				<Alert.Root variant="destructive">
+					<CircleAlert aria-hidden="true" />
+					<Alert.Title>Couldn’t update this list</Alert.Title>
+					<Alert.Description>{listActionError}</Alert.Description>
+				</Alert.Root>
 			{/if}
 			<IssueListPanel
 				currentListId={currentList.id}
@@ -612,19 +683,25 @@
 				<!-- Inline list search is disabled while search is not URL-backed. -->
 
 				{#snippet empty()}
-					<div class="grid gap-3 px-4 py-12 text-center">
-						<p class="text-sm text-muted-foreground">
-							Add issues from your Collection, or search ComicVine for something new.
-						</p>
-						<button
-							type="button"
-							class="mx-auto inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-							onclick={openSearch}
-						>
-							<Plus class="size-4" />
-							Add issues
-						</button>
-					</div>
+					<Empty.Root class="py-12">
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<ListPlus aria-hidden="true" />
+							</Empty.Media>
+							<Empty.Title>
+								<h2>This list is empty</h2>
+								</Empty.Title>
+								<Empty.Description>
+									Add issues from your Collection, or search for something new.
+								</Empty.Description>
+						</Empty.Header>
+						<Empty.Content>
+								<Button onclick={openSearch}>
+									<Plus data-icon="inline-start" />
+									Add issues
+								</Button>
+						</Empty.Content>
+					</Empty.Root>
 				{/snippet}
 			</IssueListPanel>
 		{/if}

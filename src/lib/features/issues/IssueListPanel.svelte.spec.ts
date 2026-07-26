@@ -249,6 +249,10 @@ describe('IssueListPanel', () => {
 			items: []
 		});
 
+		await expect.element(page.getByRole('alert')).toBeInTheDocument();
+		await expect
+			.element(page.getByText('Couldn’t load issues', { exact: true }))
+			.toBeInTheDocument();
 		await expect.element(page.getByText('Unable to load issues.')).toBeInTheDocument();
 		await errorRender.unmount();
 

@@ -218,6 +218,6 @@ describe('ComicSearchState', () => {
 		search.tags = [{ type: 'volume', value: 'Batman', label: 'Batman' }];
 
 		await search.search();
-		expect(search.error).toBe('ComicVine is temporarily rate limiting searches. Try again later.');
+		expect(search.error).toBe('Search is temporarily unavailable. Try again later.');
 	});
 });

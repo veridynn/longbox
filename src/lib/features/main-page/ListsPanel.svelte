@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { ListPlus, LoaderCircle } from '@lucide/svelte';
+	import { CircleAlert, ListPlus, LoaderCircle } from '@lucide/svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Button } from '$lib/components/ui/button';
+	import * as Empty from '$lib/components/ui/empty';
 	import * as Rename from '$lib/components/ui/rename';
 	import { validateListName, type CustomListSummary } from '$lib/features/lists/lists';
 	import Section from './Section.svelte';
@@ -77,9 +80,29 @@
 				Loading lists
 			</div>
 		{:else if errorMessage}
-			<p class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-				{errorMessage}
-			</p>
+			<Alert.Root variant="destructive">
+				<CircleAlert aria-hidden="true" />
+				<Alert.Title>Couldn’t load lists</Alert.Title>
+				<Alert.Description>{errorMessage}</Alert.Description>
+			</Alert.Root>
+		{:else if !customLists.length}
+			<Empty.Root class="py-8">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<ListPlus aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h3>Create your first list</h3>
+					</Empty.Title>
+					<Empty.Description>Group issues into reading queues, favorites, or any collection you want.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button onclick={onCreateList}>
+						<ListPlus data-icon="inline-start" />
+						Create list
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else}
 			<div
 				class="flex min-w-0 w-full flex-nowrap gap-3 overflow-x-auto overscroll-x-contain pb-2"

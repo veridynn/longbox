@@ -25,7 +25,7 @@ describe('POST /api/collection/add', () => {
 		await expect(response.json()).resolves.toEqual({ error: 'Authentication is required.' });
 	});
 
-	it('requires a valid ComicVine issue id', async () => {
+	it('requires a valid issue id', async () => {
 		const response = await POST({
 			request: new Request('http://localhost/api/collection/add', {
 				method: 'POST',
@@ -36,7 +36,7 @@ describe('POST /api/collection/add', () => {
 
 		expect(response.status).toBe(400);
 		await expect(response.json()).resolves.toEqual({
-			error: 'A valid ComicVine issue id is required.'
+			error: 'A valid issue is required.'
 		});
 	});
 

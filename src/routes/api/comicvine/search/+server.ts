@@ -74,7 +74,12 @@ function comicVineErrorResponse(error: unknown, headers: Record<string, string>)
 	) {
 		const comicVineError = error as ComicVineError;
 		return json(
-			{ error: comicVineError.message },
+			{
+				error:
+					comicVineError.status === 429
+						? 'Search is temporarily unavailable. Try again later.'
+						: 'Unable to search. Try again.'
+			},
 			{
 				status: comicVineError.status,
 				headers: comicVineError.retryAfterSeconds
@@ -84,5 +89,5 @@ function comicVineErrorResponse(error: unknown, headers: Record<string, string>)
 		);
 	}
 
-	return json({ error: 'Unable to search ComicVine.' }, { status: 502, headers });
+	return json({ error: 'Unable to search. Try again.' }, { status: 502, headers });
 }

@@ -1,7 +1,20 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import { Check, ChevronDown, LoaderCircle, Plus, RotateCcw, Search, X } from '@lucide/svelte';
+	import {
+		Check,
+		ChevronDown,
+		CircleAlert,
+		LoaderCircle,
+		Plus,
+		RotateCcw,
+		Search,
+		SearchX,
+		X
+	} from '@lucide/svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Button } from '$lib/components/ui/button';
 	import * as Command from '$lib/components/ui/command/index.js';
+	import * as Empty from '$lib/components/ui/empty';
 	import { formatDate } from '$lib/comics/format';
 	import type {
 		CollectionItem,
@@ -262,8 +275,28 @@
 
 	{#if search.error || addError}
 		<div class="mx-4 mt-3 grid gap-2">
-			{#if search.error}<p class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{search.error}<button type="button" class="ml-2 font-medium underline" onclick={() => search.search()}>Retry</button></p>{/if}
-			{#if addError}<p class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{addError}</p>{/if}
+			{#if search.error}
+				<Alert.Root variant="destructive">
+					<CircleAlert aria-hidden="true" />
+					<Alert.Title>Search failed</Alert.Title>
+					<Alert.Description>
+						<div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+							<p>{search.error}</p>
+							<Button size="sm" variant="outline" onclick={() => search.search()}>
+								<RotateCcw data-icon="inline-start" />
+								Retry
+							</Button>
+						</div>
+					</Alert.Description>
+				</Alert.Root>
+			{/if}
+			{#if addError}
+				<Alert.Root variant="destructive">
+					<CircleAlert aria-hidden="true" />
+					<Alert.Title>Couldn’t add this issue</Alert.Title>
+					<Alert.Description>{addError}</Alert.Description>
+				</Alert.Root>
+			{/if}
 		</div>
 	{/if}
 
@@ -312,11 +345,38 @@
 									{#if addingVolumeId === volume.id}<LoaderCircle class="size-4 animate-spin" /> Adding {volumeAddProgress.completed}/{volumeAddProgress.total || volume.issueCount || '…'}{:else}<Plus class="size-4" /> Add whole volume{/if}
 								</button>
 							</div>
-							{#if volumeAddErrors[volume.id]}<p class="border-b border-border px-4 py-2 text-sm text-destructive" role="alert">{volumeAddErrors[volume.id]}</p>{/if}
+							{#if volumeAddErrors[volume.id]}
+								<Alert.Root class="m-3 w-auto" variant="destructive">
+									<CircleAlert aria-hidden="true" />
+									<Alert.Title>Couldn’t add this volume</Alert.Title>
+									<Alert.Description>{volumeAddErrors[volume.id]}</Alert.Description>
+								</Alert.Root>
+							{/if}
 							{#if volumeState?.error}
-								<p class="px-4 py-6 text-center text-sm text-destructive">{volumeState.error} <button type="button" class="font-medium underline" onclick={() => search.loadVolume(volume)}>Retry</button></p>
+								<Alert.Root class="m-3 w-auto" variant="destructive">
+									<CircleAlert aria-hidden="true" />
+									<Alert.Title>Couldn’t load issues</Alert.Title>
+									<Alert.Description>
+										<div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+											<p>{volumeState.error}</p>
+											<Button size="sm" variant="outline" onclick={() => search.loadVolume(volume)}>
+												<RotateCcw data-icon="inline-start" />
+												Retry
+											</Button>
+										</div>
+									</Alert.Description>
+								</Alert.Root>
 							{:else if volumeState?.loaded && !volumeState.issues.length}
-								<p class="px-4 py-8 text-center text-sm text-muted-foreground">No issues in this run match every search tag.</p>
+								<Empty.Root class="py-8" role="status">
+									<Empty.Header>
+										<Empty.Title>
+											<h4>No matching issues</h4>
+										</Empty.Title>
+										<Empty.Description>
+											No issues in this run match every search tag.
+										</Empty.Description>
+									</Empty.Header>
+								</Empty.Root>
 							{:else if volumeState?.issues.length}
 								<ul class="divide-y divide-border">
 									{#each volumeState.issues as issue (issue.id)}
@@ -325,7 +385,7 @@
 											<div class="min-w-0 flex-1">
 												<h4 class="line-clamp-2 text-sm font-semibold">{searchIssueTitle(issue)}</h4>
 												<p class="mt-1 text-xs text-muted-foreground">{issue.volume.publisher?.name ?? 'Unknown publisher'} · {formatDate(issue.coverDate)}</p>
-												{#if issue.siteDetailUrl}<a class="mt-2 inline-block text-xs font-medium underline-offset-4 hover:underline" href={issue.siteDetailUrl} target="_blank" rel="noreferrer">View on ComicVine</a>{/if}
+												{#if issue.siteDetailUrl}<a class="mt-2 inline-block text-xs font-medium underline-offset-4 hover:underline" href={issue.siteDetailUrl} target="_blank" rel="noreferrer">View source</a>{/if}
 											</div>
 											<button type="button" class="col-start-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted disabled:opacity-70 sm:col-auto sm:shrink-0" aria-label={isInCollection(issue) ? `${searchIssueTitle(issue)} is already in ${targetName}` : `Add ${searchIssueTitle(issue)} to ${targetName}`} disabled={addingIssueIds.includes(issue.id) || isInCollection(issue)} onclick={() => onAddIssue(issue)}>
 												{#if addingIssueIds.includes(issue.id)}<LoaderCircle class="size-4 animate-spin" />{:else if isInCollection(issue)}<Check class="size-4" /> {addedLabel}{:else}<Plus class="size-4" /> Add{/if}
@@ -340,13 +400,55 @@
 				{/each}
 			</div>
 		{:else if search.isSearching}
-			<p class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-muted-foreground" role="status"><LoaderCircle class="size-4 animate-spin" /> Searching ComicVine…</p>
+			<p class="flex items-center justify-center gap-2 px-4 py-12 text-sm text-muted-foreground" role="status"><LoaderCircle class="size-4 animate-spin" /> Searching comics…</p>
 		{:else if search.hasSearched && !search.hasAnchor}
-			<p class="px-4 py-12 text-center text-sm text-muted-foreground">Add a Volume or Character search.</p>
+			<Empty.Root class="py-12" role="status">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Search aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h3>Add a volume or character</h3>
+					</Empty.Title>
+					<Empty.Description>
+						Add a Volume or Character search before looking for matching runs.
+					</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
 		{:else if search.hasSearched && !search.error}
-			<div class="grid gap-2 px-4 py-12 text-center text-sm text-muted-foreground" role="status"><p>No matching runs found.</p><p class="text-xs">Remove a search tag or try a broader volume title.</p></div>
+			<Empty.Root class="py-12" role="status">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<SearchX aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h3>No matching runs found</h3>
+					</Empty.Title>
+					<Empty.Description>
+						Remove a search tag or try a broader volume title.
+					</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button variant="outline" onclick={() => search.reset()}>
+						<RotateCcw data-icon="inline-start" />
+						Clear search
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else}
-			<p class="px-4 py-12 text-center text-sm text-muted-foreground">Add a volume or character search to find comics.</p>
+			<Empty.Root class="py-12">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Search aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h3>Search comics</h3>
+					</Empty.Title>
+					<Empty.Description>
+						Add a volume or character search to find comics.
+					</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
 		{/if}
 
 		{#if search.hasMore && !search.isSearching}

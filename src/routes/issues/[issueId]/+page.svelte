@@ -1,21 +1,27 @@
 <script lang="ts">
 	import {
+		BookX,
 		BookOpen,
 		BookOpenCheck,
 		CalendarIcon,
 		ArrowLeft,
 		CheckCircle2,
+		CircleAlert,
 		Heart,
 		HeartOff,
+		House,
 		LoaderCircle,
 		Package,
-		PackageCheck
+		PackageCheck,
+		RefreshCcw
 	} from '@lucide/svelte';
 	import { CalendarDate, DateFormatter, getLocalTimeZone, type DateValue } from '@internationalized/date';
 	import { flushSync } from 'svelte';
 	import type { PageProps } from './$types';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
+	import * as Empty from '$lib/components/ui/empty';
 	import { Input } from '$lib/components/ui/input';
 	import * as Popover from '$lib/components/ui/popover';
 	import * as StarRating from '$lib/components/ui/star-rating';
@@ -403,22 +409,50 @@
 		</div>
 
 		{#if issueQuery.error}
-			<section class="rounded-lg border border-border bg-card p-6">
-				<h1 class="text-2xl font-semibold">Unable to load issue</h1>
-				<p class="mt-2 text-sm leading-6 text-destructive">{issueQuery.error.message}</p>
-			</section>
+			<Empty.Root class="min-h-96 border" aria-labelledby="issue-load-error-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<CircleAlert aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h1 id="issue-load-error-title">Couldn’t load this issue</h1>
+					</Empty.Title>
+					<Empty.Description>Check your connection and try again.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content class="sm:flex-row">
+					<Button onclick={() => window.location.reload()}>
+						<RefreshCcw data-icon="inline-start" />
+						Reload page
+					</Button>
+					<Button href="/" variant="outline">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else if issueQuery.isLoading && !transitionPreview}
 			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
 				<LoaderCircle class="mr-2 size-4 animate-spin" />
 				Loading issue
 			</div>
 		{:else if !issue && !transitionPreview}
-			<section class="rounded-lg border border-border bg-card p-6">
-				<h1 class="text-2xl font-semibold">Issue not found</h1>
-				<p class="mt-2 text-sm leading-6 text-muted-foreground">
-					This issue is not available in the local catalog.
-				</p>
-			</section>
+			<Empty.Root class="min-h-96 border" aria-labelledby="issue-not-found-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<BookX aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h1 id="issue-not-found-title">Issue not found</h1>
+					</Empty.Title>
+					<Empty.Description>This issue is not available in the local catalog.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button href="/">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else}
 			<div class="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
 				<aside class="space-y-4">
@@ -466,7 +500,11 @@
 									Loading saved issue
 								</div>
 							{:else if userIssueQuery.error}
-								<p class="mt-3 text-sm text-destructive">{userIssueQuery.error.message}</p>
+								<Alert.Root class="mt-3" variant="destructive">
+									<CircleAlert aria-hidden="true" />
+									<Alert.Title>Couldn’t load collection details</Alert.Title>
+									<Alert.Description>Check your connection and reload the page.</Alert.Description>
+								</Alert.Root>
 							{:else if userIssue}
 								<div class="mt-3 space-y-3">
 									<div class="grid grid-cols-3 gap-2">
@@ -606,7 +644,11 @@
 								</div>
 
 								{#if saveError}
-									<p class="mt-3 text-sm text-destructive">{saveError}</p>
+									<Alert.Root class="mt-3" variant="destructive">
+										<CircleAlert aria-hidden="true" />
+										<Alert.Title>Couldn’t save changes</Alert.Title>
+										<Alert.Description>{saveError}</Alert.Description>
+									</Alert.Root>
 								{/if}
 							{:else}
 								<p class="mt-3 text-sm leading-6 text-muted-foreground">

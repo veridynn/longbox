@@ -42,12 +42,11 @@ async function readSearchResponse(response: Response): Promise<SearchResponse | 
 	}
 }
 
-function responseError(response: Response, body: SearchResponse | null) {
-	if (body && 'error' in body && body.error) return body.error;
+function responseError(response: Response) {
 	if (response.status === 429) {
-		return 'ComicVine is temporarily rate limiting searches. Try again later.';
+		return 'Search is temporarily unavailable. Try again later.';
 	}
-	return 'Unable to search ComicVine. Try again.';
+	return 'Unable to search. Try again.';
 }
 
 function tagKey(tag: SearchTag) {
@@ -234,11 +233,11 @@ export class ComicSearchState {
 			const body = await readSearchResponse(response);
 			if (requestId !== this.#requestId || controller.signal.aborted) return;
 			if (!response.ok) {
-				this.error = responseError(response, body);
+				this.error = responseError(response);
 				return;
 			}
 			if (!body || !('mode' in body) || body.mode === 'suggestions') {
-				this.error = 'ComicVine returned an invalid response. Try again.';
+				this.error = 'Search returned an invalid response. Try again.';
 				return;
 			}
 
@@ -253,7 +252,7 @@ export class ComicSearchState {
 			}
 		} catch {
 			if (requestId === this.#requestId && !controller.signal.aborted) {
-				this.error = 'Unable to search ComicVine. Try again.';
+				this.error = 'Unable to search. Try again.';
 			}
 		} finally {
 			if (requestId === this.#requestId) {
@@ -305,7 +304,7 @@ export class ComicSearchState {
 					[volume.id]: {
 						...existing,
 						isLoading: false,
-						error: responseError(response, body)
+						error: responseError(response)
 					}
 				};
 				return;
@@ -353,13 +352,13 @@ export class ComicSearchState {
 			const response = await fetch(`/api/comicvine/search?${params}`, { cache: 'no-store' });
 			const body = await readSearchResponse(response);
 			if (!response.ok || !body || !('mode' in body) || body.mode !== 'issues') {
-				throw new Error(responseError(response, body));
+				throw new Error(responseError(response));
 			}
 
 			issues = this.#mergeIssues(issues, body.results);
 			if (!body.hasMore) return issues;
 			if (!body.nextOffset || body.nextOffset <= offset) {
-				throw new Error('ComicVine returned invalid volume pagination.');
+				throw new Error('Search returned invalid volume pagination.');
 			}
 			offset = body.nextOffset;
 		}
@@ -478,7 +477,7 @@ export class ComicSearchState {
 			const body = await readSearchResponse(response);
 			if (requestId !== this.#suggestRequestId || controller.signal.aborted) return;
 			if (!response.ok || !body || !('mode' in body) || body.mode !== 'suggestions') {
-				this.suggestionError = responseError(response, body);
+				this.suggestionError = responseError(response);
 				return;
 			}
 			this.suggestions = body.results;

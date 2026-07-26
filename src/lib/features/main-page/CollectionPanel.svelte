@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Plus, Search } from '@lucide/svelte';
+	import { LibraryBig, Plus, Search } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Empty from '$lib/components/ui/empty';
 	import IssueListPanel from '$lib/features/issues/IssueListPanel.svelte';
 	import type { IssueListViewMode } from '$lib/features/issues/view-mode';
 	import type { CollectionItem, UserIssuePatch } from '$lib/comics/types';
@@ -81,22 +83,25 @@
 		{onViewModeChange}
 	>
 		{#snippet empty()}
-			<div class="grid gap-3 px-4 py-12 text-center">
-				<div class="grid gap-1">
-					<h2 class="text-base font-semibold">Your collection is empty</h2>
-					<p class="text-sm text-muted-foreground">
+			<Empty.Root class="py-12">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<LibraryBig aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h2>Your collection is empty</h2>
+					</Empty.Title>
+					<Empty.Description>
 						Add your first issue to start building your collection.
-					</p>
-				</div>
-				<button
-					type="button"
-					class="mx-auto inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-					onclick={onAddIssue}
-				>
-					<Plus class="size-4" />
-					Add first issue
-				</button>
-			</div>
+					</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button onclick={onAddIssue}>
+						<Plus data-icon="inline-start" />
+						Add first issue
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{/snippet}
 	</IssueListPanel>
 </Section>

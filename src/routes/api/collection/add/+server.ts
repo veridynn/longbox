@@ -27,7 +27,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const listId = typeof body.listId === 'string' && body.listId.trim() ? body.listId.trim() : null;
 
 	if (!Number.isInteger(issueId) || issueId <= 0) {
-		return json({ error: 'A valid ComicVine issue id is required.' }, { status: 400 });
+		return json({ error: 'A valid issue is required.' }, { status: 400 });
 	}
 
 	try {
@@ -36,7 +36,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ imported });
 	} catch (error) {
 		if (error instanceof ComicVineError) {
-			return json({ error: error.message }, { status: error.status });
+			const message = error.status === 400 ? error.message : 'Unable to add issue. Try again.';
+			return json({ error: message }, { status: error.status });
 		}
 
 		const message = error instanceof Error ? error.message : 'Unable to add issue.';

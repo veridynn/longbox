@@ -46,6 +46,38 @@ afterEach(() => {
 });
 
 describe('ComicSearchPanel', () => {
+	it('shows actionable initial and zero-result empty states', async () => {
+		const search = new ComicSearchState();
+		renderSearch(search);
+
+		await expect.element(page.getByRole('heading', { name: 'Search comics' })).toBeInTheDocument();
+
+		search.tags = [{ type: 'volume', value: 'Batman', label: 'Batman' }];
+		search.hasSearched = true;
+
+		await expect
+			.element(page.getByRole('heading', { name: 'No matching runs found' }))
+			.toBeInTheDocument();
+		await page.getByRole('button', { name: 'Clear search' }).click();
+
+		expect(search.tags).toEqual([]);
+		await expect.element(page.getByRole('heading', { name: 'Search comics' })).toBeInTheDocument();
+	});
+
+	it('retries a failed search through its existing search action', async () => {
+		const search = new ComicSearchState();
+		search.tags = [{ type: 'volume', value: 'Batman', label: 'Batman' }];
+		search.hasSearched = true;
+		search.error = 'Unable to search. Try again.';
+		const retry = vi.spyOn(search, 'search').mockResolvedValue();
+		renderSearch(search);
+
+		await expect.element(page.getByRole('alert')).toBeInTheDocument();
+		await page.getByRole('button', { name: 'Retry' }).click();
+
+		expect(retry).toHaveBeenCalledOnce();
+	});
+
 	it('supports slash commands and commits resolved character tags', async () => {
 		const fetchMock = vi
 			.fn()

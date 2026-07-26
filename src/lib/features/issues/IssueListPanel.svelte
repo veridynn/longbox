@@ -6,6 +6,7 @@
 		BookOpenCheck,
 		Check,
 		ChevronDown,
+		CircleAlert,
 		ClockArrowDown,
 		ClockArrowUp,
 		Grid2x2,
@@ -23,6 +24,7 @@
 	import { flushSync } from 'svelte';
 	import { formatDate } from '$lib/comics/format';
 	import type { CollectionIssue, CollectionItem, UserIssuePatch } from '$lib/comics/types';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
 	import * as Popover from '$lib/components/ui/popover';
@@ -310,7 +312,11 @@
 			Loading issues
 		</div>
 	{:else if errorMessage}
-		<p class="px-4 py-6 text-sm text-destructive">{errorMessage}</p>
+		<Alert.Root class="m-4 w-auto" variant="destructive">
+			<CircleAlert aria-hidden="true" />
+			<Alert.Title>Couldn’t load issues</Alert.Title>
+			<Alert.Description>{errorMessage}</Alert.Description>
+		</Alert.Root>
 	{:else if !sortedItems.length && empty}
 		{@render empty()}
 	{:else if viewMode === 'gallery'}

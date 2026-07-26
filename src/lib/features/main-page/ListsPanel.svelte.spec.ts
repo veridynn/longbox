@@ -72,7 +72,7 @@ describe('ListsPanel', () => {
 		expect(page.getByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
 	});
 
-	it('opens list creation from the header button and keyboard shortcut', async () => {
+	it('prompts for a first list and opens creation from the empty state or shortcut', async () => {
 		const onCreateList = vi.fn();
 		render(ListsPanel, {
 			customLists: [],
@@ -80,7 +80,15 @@ describe('ListsPanel', () => {
 			onRenameList: vi.fn()
 		});
 
-		await page.getByRole('button', { name: /Create list/ }).click();
+		await expect
+			.element(page.getByRole('heading', { name: 'Create your first list' }))
+			.toBeInTheDocument();
+		await expect
+			.element(
+				page.getByText('Group issues into reading queues, favorites, or any collection you want.')
+			)
+			.toBeInTheDocument();
+		await page.getByRole('button', { name: 'Create list', exact: true }).last().click();
 		expect(onCreateList).toHaveBeenCalledTimes(1);
 
 		document.dispatchEvent(
