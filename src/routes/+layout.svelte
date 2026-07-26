@@ -10,7 +10,7 @@
 		clearIssueTransition,
 		issueTransitionDirection,
 		markIssueTransitionIncoming
-	} from '$lib/comics/view-transitions.svelte.ts';
+	} from '$lib/comics/view-transitions.svelte';
 	import { ConfirmDeleteDialog } from '$lib/components/ui/confirm-delete-dialog';
 	import SaveAccountConfirmationDialog from '$lib/features/auth/SaveAccountConfirmationDialog.svelte';
 	import SaveAccountDialog from '$lib/features/auth/SaveAccountDialog.svelte';
@@ -98,6 +98,29 @@
 			: (pendingProfileImageSrc ?? currentProfileImage?.url ?? '')
 	);
 
+	function issueTransitionCover(issueId: string) {
+		const selector = `[data-issue-transition-cover="${CSS.escape(issueId)}"]`;
+		const existingCover = document.querySelector(selector);
+		if (existingCover) return Promise.resolve(existingCover);
+
+		return new Promise<Element | null>((resolve) => {
+			const observer = new MutationObserver(() => {
+				const cover = document.querySelector(selector);
+				if (cover) finish(cover);
+			});
+			const timeout = window.setTimeout(() => finish(null), 200);
+
+			function finish(cover: Element | null) {
+				observer.disconnect();
+				window.clearTimeout(timeout);
+				resolve(cover);
+			}
+
+			// ponytail: cap the frozen snapshot; add a route-level preview if cached data exceeds 200ms.
+			observer.observe(document.body, { childList: true, subtree: true });
+		});
+	}
+
 	onNavigate((navigation) => {
 		const direction = issueTransitionDirection(navigation);
 
@@ -106,7 +129,6 @@
 		}
 
 		if (
-			activeViewTransition ||
 			!document.startViewTransition ||
 			window.matchMedia('(prefers-reduced-motion: reduce)').matches
 		) {
@@ -119,8 +141,6 @@
 			return;
 		}
 
-		document.documentElement.classList.add(activated.direction);
-
 		return new Promise<void>((resolveOldStateCapture) => {
 			const transition = document.startViewTransition({
 				types: [activated.direction],
@@ -128,16 +148,20 @@
 					resolveOldStateCapture();
 					await navigation.complete;
 					flushSync(markIssueTransitionIncoming);
+					if (activated.direction === 'issue-back' && activated.hasSharedCover) {
+						(await issueTransitionCover(activated.issueId))?.scrollIntoView({ block: 'center' });
+					}
 				}
 			});
 
 			activeViewTransition = transition;
 
-			void transition.finished.finally(() => {
-				document.documentElement.classList.remove(activated.direction);
+			const cleanup = () => {
+				if (activeViewTransition !== transition) return;
 				activeViewTransition = null;
 				clearIssueTransition();
-			});
+			};
+			void transition.finished.then(cleanup, cleanup);
 		});
 	});
 

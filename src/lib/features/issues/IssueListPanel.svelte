@@ -32,9 +32,10 @@
 	import * as StarRating from '$lib/components/ui/star-rating';
 	import {
 		isActiveIssueTransition,
+		issueTransition,
 		issueViewTransitionName,
 		primeIssueTransition
-	} from '$lib/comics/view-transitions.svelte.ts';
+	} from '$lib/comics/view-transitions.svelte';
 	import {
 		IssueSort,
 		issueSortLabel,
@@ -47,6 +48,7 @@
 	type Props = {
 		controls?: Snippet;
 		currentListId?: string | null;
+		currentListName?: string | null;
 		empty?: Snippet;
 		errorMessage?: string | null;
 		isLoading?: boolean;
@@ -66,6 +68,7 @@
 	let {
 		controls,
 		currentListId = null,
+		currentListName = null,
 		empty,
 		errorMessage = null,
 		isLoading = false,
@@ -228,8 +231,14 @@
 		});
 	}
 
-	function prepareIssueTransition(issue: CollectionIssue, listPosition?: number) {
-		flushSync(() => primeIssueTransition(issue, { listPosition }));
+	function prepareIssueTransition(issue: CollectionIssue) {
+		flushSync(() =>
+			primeIssueTransition(issue, {
+				hasSharedCover: viewMode === 'gallery',
+				sourceHref: `${location.pathname}${location.search}${location.hash}`,
+				sourceLabel: currentListName ?? 'Collection'
+			})
+		);
 	}
 </script>
 
@@ -320,7 +329,12 @@
 	{:else if !sortedItems.length && empty}
 		{@render empty()}
 	{:else if viewMode === 'gallery'}
-		<ul class="grid grid-cols-2 gap-4 px-4 py-4 sm:grid-cols-3 md:grid-cols-4">
+		<ul
+			class="grid grid-cols-2 gap-4 px-4 py-4 sm:grid-cols-3 md:grid-cols-4"
+			style:view-transition-name={issueTransition.direction === 'issue-back'
+				? 'issue-gallery'
+				: null}
+		>
 			{#each sortedItems as item (item.id)}
 				{@const issue = item.userIssue?.issue}
 				{#if issue}
@@ -328,13 +342,14 @@
 						<a
 							class="block overflow-hidden bg-muted text-foreground shadow-sm transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							href={`/issues/${issue.id}`}
-							onpointerdown={() => prepareIssueTransition(issue, item.position)}
-							onclick={() => prepareIssueTransition(issue, item.position)}
+							onpointerdown={() => prepareIssueTransition(issue)}
+							onclick={() => prepareIssueTransition(issue)}
 						>
 							<img
 								class="aspect-[2/3] w-full border border-border object-cover"
 								src={issue.coverImageUrl ?? '/robots.txt'}
 								alt=""
+								data-issue-transition-cover={issue.id}
 								style:view-transition-name={isActiveIssueTransition(issue.id)
 									? issueViewTransitionName(issue.id, 'cover')
 									: null}
@@ -342,13 +357,16 @@
 							/>
 							<div
 								class="absolute inset-x-0 bottom-0 bg-linear-to-t from-background/95 via-background/70 to-transparent p-3 pt-10"
+								style:view-transition-name={issueTransition.direction === 'issue-back' &&
+								isActiveIssueTransition(issue.id)
+									? issueViewTransitionName(issue.id, 'card-content')
+									: null}
+								style:view-transition-class={issueTransition.direction === 'issue-back' &&
+								isActiveIssueTransition(issue.id)
+									? 'issue-card-content'
+									: null}
 							>
-								<h3
-									class="line-clamp-2 text-sm font-semibold"
-									style:view-transition-name={isActiveIssueTransition(issue.id)
-										? issueViewTransitionName(issue.id, 'title')
-										: null}
-								>
+								<h3 class="line-clamp-2 text-sm font-semibold">
 									{issueTitle(item)}
 								</h3>
 								<p class="mt-1 line-clamp-1 text-xs text-muted-foreground">
@@ -411,17 +429,19 @@
 								<a
 									class="underline-offset-4 hover:underline"
 									href={`/issues/${issue.id}`}
-									onpointerdown={() => prepareIssueTransition(issue, item.position)}
-									onclick={() => prepareIssueTransition(issue, item.position)}
+									onpointerdown={() => prepareIssueTransition(issue)}
+									onclick={() => prepareIssueTransition(issue)}
 								>
 									#{issue.issueNumber}
 								</a>
 							</div>
-							<div
-								class="max-w-56 px-3 py-2"
-								style:view-transition-name={issueViewTransitionName(issue.id, 'title')}
-							>
-								<a class="line-clamp-2 underline-offset-4 hover:underline" href={`/issues/${issue.id}`}>
+							<div class="max-w-56 px-3 py-2">
+								<a
+									class="line-clamp-2 underline-offset-4 hover:underline"
+									href={`/issues/${issue.id}`}
+									onpointerdown={() => prepareIssueTransition(issue)}
+									onclick={() => prepareIssueTransition(issue)}
+								>
 									{issueName(issue)}
 								</a>
 							</div>

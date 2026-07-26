@@ -1,13 +1,15 @@
 import type { CollectionIssue } from './types';
 
-export type IssueTransitionPart = 'cover';
+export type IssueTransitionPart = 'card-content' | 'cover';
 export type IssueTransitionDirection = 'issue-forward' | 'issue-back';
 export type IssueTransitionPhase = 'idle' | 'capturing' | 'incoming';
 
 export type IssueTransitionPreview = {
 	coverImageUrl: string | null;
+	hasSharedCover: boolean;
 	issueId: string;
-	listPosition: number | null;
+	sourceHref: string;
+	sourceLabel: string;
 	title: string;
 };
 
@@ -28,10 +30,13 @@ type TransitionIssue = Pick<
 	'coverImageUrl' | 'id' | 'issueNumber' | 'name' | 'volume'
 >;
 type PrimeIssueTransitionOptions = {
-	listPosition?: number;
+	hasSharedCover?: boolean;
+	sourceHref?: string;
+	sourceLabel?: string;
 };
 
 const issueRoutePattern = /^\/issues\/([^/]+)\/?$/;
+const issueListRoutePattern = /^\/(?:list\/[^/]+)?\/?$/;
 
 const state = $state<IssueTransitionState>({
 	direction: null,
@@ -71,10 +76,15 @@ export function primeIssueTransition(
 	issue: TransitionIssue,
 	options: PrimeIssueTransitionOptions = {}
 ) {
-	const existingPosition = state.preview?.issueId === issue.id ? state.preview.listPosition : null;
+	const existingPreview = state.preview?.issueId === issue.id ? state.preview : null;
 
 	state.issueId = issue.id;
-	state.preview = issueTransitionPreview(issue, options.listPosition ?? existingPosition);
+	state.preview = issueTransitionPreview(
+		issue,
+		options.hasSharedCover ?? existingPreview?.hasSharedCover ?? false,
+		options.sourceHref ?? existingPreview?.sourceHref ?? '/',
+		options.sourceLabel ?? existingPreview?.sourceLabel ?? 'Collection'
+	);
 }
 
 export function activateIssueTransition(navigation: TransitionNavigation) {
@@ -88,7 +98,11 @@ export function activateIssueTransition(navigation: TransitionNavigation) {
 	state.direction = direction;
 	state.issueId = issueId;
 	state.phase = 'capturing';
-	return { direction, issueId };
+	return {
+		direction,
+		hasSharedCover: state.preview?.issueId === issueId && state.preview.hasSharedCover,
+		issueId
+	};
 }
 
 export function markIssueTransitionIncoming() {
@@ -113,15 +127,19 @@ export function issueTransitionDirection(
 	const from = navigation.from?.url.pathname;
 	const to = navigation.to?.url.pathname;
 
-	if (from === '/' && Boolean(issueIdFromPath(to))) {
+	if (isIssueListPath(from) && Boolean(issueIdFromPath(to))) {
 		return 'issue-forward';
 	}
 
-	if (Boolean(issueIdFromPath(from)) && to === '/') {
+	if (Boolean(issueIdFromPath(from)) && isIssueListPath(to)) {
 		return 'issue-back';
 	}
 
 	return null;
+}
+
+function isIssueListPath(pathname: string | undefined) {
+	return Boolean(pathname && issueListRoutePattern.test(pathname));
 }
 
 export function issueTransitionIssueId(navigation: TransitionNavigation) {
@@ -149,12 +167,16 @@ export function issueIdFromPath(pathname: string | undefined) {
 
 function issueTransitionPreview(
 	issue: TransitionIssue,
-	listPosition: number | null
+	hasSharedCover: boolean,
+	sourceHref: string,
+	sourceLabel: string
 ): IssueTransitionPreview {
 	return {
 		coverImageUrl: issue.coverImageUrl ?? null,
+		hasSharedCover,
 		issueId: issue.id,
-		listPosition,
+		sourceHref,
+		sourceLabel,
 		title: issueTitle(issue)
 	};
 }

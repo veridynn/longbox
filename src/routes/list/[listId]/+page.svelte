@@ -20,7 +20,7 @@
 	import ComicSearchPanel from '$lib/features/search/ComicSearchPanel.svelte';
 	import { ComicSearchState } from '$lib/features/search/comic-search-state.svelte';
 	import * as Alert from '$lib/components/ui/alert';
-	import { Button } from '$lib/components/ui/button';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import { confirmDelete } from '$lib/components/ui/confirm-delete-dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Rename from '$lib/components/ui/rename';
@@ -515,7 +515,10 @@
 
 					{#if auth.user && currentList}
 						<Popover.Root bind:open={listMenuOpen}>
-							<Popover.Trigger aria-label="Open list actions" size="icon-sm" variant="ghost">
+							<Popover.Trigger
+								aria-label="Open list actions"
+								class={buttonVariants({ size: 'icon-sm', variant: 'ghost' })}
+							>
 								<EllipsisVertical />
 							</Popover.Trigger>
 							<Popover.Content class="w-max p-1.5" align="start">
@@ -668,6 +671,7 @@
 			{/if}
 			<IssueListPanel
 				currentListId={currentList.id}
+				currentListName={currentList.name}
 				items={filteredListItems}
 				sortKey={listSortKey}
 				viewMode={listViewMode}

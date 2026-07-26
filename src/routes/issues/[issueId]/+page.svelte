@@ -33,7 +33,7 @@
 		isActiveIssueTransition,
 		issueViewTransitionName,
 		primeIssueTransition
-	} from '$lib/comics/view-transitions.svelte.ts';
+	} from '$lib/comics/view-transitions.svelte';
 	import { db } from '$lib/db';
 
 	type DetailUserIssue = {
@@ -102,7 +102,7 @@
 	let saveError = $state<string | null>(null);
 	let noteInput = $state<HTMLInputElement | null>(null);
 	let activeUserIssueId: string | null = null;
-	let saveTimeout: ReturnType<typeof window.setTimeout> | null = null;
+	let saveTimeout: number | null = null;
 	let saveRequestId = 0;
 
 	const userIssue = $derived(
@@ -113,8 +113,10 @@
 	const title = $derived(issue ? issueTitle(issue) : (transitionPreview?.title ?? 'Issue details'));
 	const coverImageUrl = $derived(issue?.coverImageUrl ?? transitionPreview?.coverImageUrl ?? null);
 	const coverInViewTransition = $derived(
-		isActiveIssueTransition(params.issueId) || transitionPreview?.issueId === params.issueId
+		isActiveIssueTransition(params.issueId) && transitionPreview?.hasSharedCover === true
 	);
+	const returnHref = $derived(transitionPreview?.sourceHref ?? '/');
+	const returnLabel = $derived(transitionPreview?.sourceLabel ?? 'Collection');
 	const credits = $derived(groupCredits(issue));
 	const characters = $derived(characterNames(issue));
 	const details = $derived(detailRows(issue));
@@ -397,14 +399,14 @@
 	<section class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
 		<div>
 			<Button
-				href="/"
+				href={returnHref}
 				variant="ghost"
 				class="mb-4 -ml-2"
 				onpointerdown={prepareIssueTransition}
 				onclick={prepareIssueTransition}
 			>
 				<ArrowLeft data-icon="inline-start" />
-				Collection
+				{returnLabel}
 			</Button>
 		</div>
 

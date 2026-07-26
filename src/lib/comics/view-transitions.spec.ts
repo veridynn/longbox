@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+	activateIssueTransition,
+	clearIssueTransition,
+	clearIssueTransitionPreview,
+	getIssueTransitionPreview,
 	issueIdFromPath,
 	issueTransitionDirection,
 	issueTransitionIssueId,
-	issueViewTransitionName
+	issueViewTransitionName,
+	primeIssueTransition
 } from './view-transitions.svelte.ts';
 
 function navigation(from: string, to: string) {
@@ -33,11 +38,53 @@ describe('issue view transition helpers', () => {
 		expect(issueTransitionIssueId(nav)).toBe('issue-123');
 	});
 
+	it('detects custom list to issue detail transitions', () => {
+		expect(issueTransitionDirection(navigation('/list/favorites', '/issues/issue-123'))).toBe(
+			'issue-forward'
+		);
+		expect(issueTransitionDirection(navigation('/issues/issue-123', '/list/favorites'))).toBe(
+			'issue-back'
+		);
+	});
+
 	it('detects issue detail to collection transitions', () => {
 		const nav = navigation('/issues/issue-123', '/');
 
 		expect(issueTransitionDirection(nav)).toBe('issue-back');
 		expect(issueTransitionIssueId(nav)).toBe('issue-123');
+	});
+
+	it('preserves the source page when details primes the return transition', () => {
+		const issue = {
+			coverImageUrl: 'https://img.example/cover.jpg',
+			id: 'issue-123',
+			issueNumber: '1',
+			name: 'Book One',
+			volume: { id: 'volume-1', name: 'Saga' }
+		};
+
+		primeIssueTransition(issue, {
+			hasSharedCover: true,
+			sourceHref: '/list/favorites?view=gallery',
+			sourceLabel: 'Favorites'
+		});
+		primeIssueTransition(issue);
+
+		expect(getIssueTransitionPreview(issue.id)).toMatchObject({
+			hasSharedCover: true,
+			sourceHref: '/list/favorites?view=gallery',
+			sourceLabel: 'Favorites'
+		});
+		expect(
+			activateIssueTransition(navigation('/list/favorites', '/issues/issue-123'))
+		).toMatchObject({
+			direction: 'issue-forward',
+			hasSharedCover: true,
+			issueId: 'issue-123'
+		});
+
+		clearIssueTransition();
+		clearIssueTransitionPreview();
 	});
 
 	it('ignores unrelated transitions', () => {
