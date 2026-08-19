@@ -11,7 +11,7 @@ const rules = {
 			delete:
 				"auth.id != null && auth.id in data.ref('list.owner.id') && auth.id in data.ref('userIssue.owner.id')",
 			update:
-				"auth.id != null && auth.id in data.ref('list.owner.id') && auth.id in data.ref('userIssue.owner.id') && auth.id != null && auth.id in newData.ref('list.owner.id') && auth.id in newData.ref('userIssue.owner.id')"
+				"auth.id != null && auth.id in data.ref('list.owner.id') && auth.id in data.ref('userIssue.owner.id')"
 		}
 	},
 	issueCharacters: {
@@ -46,13 +46,21 @@ const rules = {
 			update: 'auth.id != null && auth.id == data.id'
 		}
 	},
+	$files: {
+		bind: ['isOwner', "auth.id != null && data.path.startsWith(auth.id + '/')"],
+		allow: {
+			view: 'isOwner',
+			create: 'isOwner',
+			delete: 'isOwner',
+			update: 'isOwner'
+		}
+	},
 	userLists: {
 		allow: {
 			view: "auth.id != null && auth.id in data.ref('owner.id')",
 			create: "auth.id != null && auth.id in data.ref('owner.id')",
 			delete: "auth.id != null && auth.id in data.ref('owner.id')",
-			update:
-				"auth.id != null && auth.id in data.ref('owner.id') && auth.id != null && auth.id in newData.ref('owner.id')"
+			update: "auth.id != null && auth.id in data.ref('owner.id')"
 		}
 	},
 	profiles: {
@@ -60,8 +68,7 @@ const rules = {
 			view: "auth.id != null && auth.id in data.ref('user.id')",
 			create: "auth.id != null && auth.id in data.ref('user.id')",
 			delete: "auth.id != null && auth.id in data.ref('user.id')",
-			update:
-				"auth.id != null && auth.id in data.ref('user.id') && auth.id != null && auth.id in newData.ref('user.id')"
+			update: "auth.id != null && auth.id in data.ref('user.id')"
 		}
 	},
 	characters: {
@@ -114,8 +121,7 @@ const rules = {
 			view: "auth.id != null && auth.id in data.ref('owner.id')",
 			create: "auth.id != null && auth.id in data.ref('owner.id')",
 			delete: "auth.id != null && auth.id in data.ref('owner.id')",
-			update:
-				"auth.id != null && auth.id in data.ref('owner.id') && auth.id != null && auth.id in newData.ref('owner.id')"
+			update: "auth.id != null && auth.id in data.ref('owner.id')"
 		}
 	},
 	issueCredits: {

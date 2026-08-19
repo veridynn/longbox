@@ -1,13 +1,12 @@
 # ![Longbox logo][longbox-logo] Longbox
 
-Longbox is a local-first comic library for organizing a personal collection, keeping issue notes, building custom lists, and rediscovering what is already on the shelf.
+Longbox is a personal comic collection manager for importing issues, tracking owned/read status, adding notes and ratings, and building custom lists.
 
 ## 🧰 Tech Stack
 
 ![svelte-typescript-vite-pnpm][tech-stack-icons]
 
-- `SvelteKit 2`
-- `Svelte 5`
+- `Svelte 5 / SvelteKit 2`
 - `TypeScript`
 - `Vite Plus`
 - `pnpm`
@@ -21,6 +20,39 @@ Longbox is a local-first comic library for organizing a personal collection, kee
 ```sh
 vp install && vpr dev
 ```
+
+## ☑️ Todo
+
+- [ ] Disable caching for development enviorment so page refreshes always show the latest changes.
+- [x] Separate development and production databases.
+- [x] Move agent documentation from `docs` to `.agents/docs`, including a new home for `docs/assets/longbox-logo.svg`.
+- [ ] Prevent duplicate collection issues
+- [ ] Dev/prod InstantDB env split needs to be documented and verified end to end
+- [ ] PWA caching still needs a dev-mode strategy
+- [ ] Add publisher-only recent-run search after choosing a bounded scan or local index; Comic Vine cannot filter volumes by publisher or sort them by start year
+- [ ] Remove env file setup
+- [ ] Fix back button from list page to issue detail page (leads to main page instead of back to list page)
+- [ ] rework list component
+  - [x] remove list title and unify list component (in list page you see title twice: page title and list title)
+  - [x] add views
+    - [x] gried view
+    - [ ] list view
+  - [ ] add edit mode
+    - [ ] add dnd
+    - [ ] add delete
+      - [ ] Warn before removing a collection issue that is used in lists: show the affected lists, let the user delete or keep it, and bulk actions include a toggle to reuse that choice
+  - [ ] add filters
+  - [x] add search
+  - [x] add sorts
+  - [ ] how to handle custome order?
+  - [ ] optemize image loading for big collection (not all at once)
+  - [x] rating
+    - [x] remove the fraction numeric display in issue detail page
+
+## 🪲 Bugs
+
+- [ ] back button should be a browser back and not just pointing to the main page
+- [ ] tabing out of delete dialog closes it (should be trapped in dialog)
 
 ## 📜 Scripts
 

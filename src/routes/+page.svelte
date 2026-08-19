@@ -1,48 +1,77 @@
 <script lang="ts">
-	import { LoaderCircle } from '@lucide/svelte';
-	import AppHeader from '$lib/components/library/AppHeader.svelte';
-	import AuthGate from '$lib/components/library/AuthGate.svelte';
-	import ComicSearchPanel from '$lib/components/library/ComicSearchPanel.svelte';
-	import LibraryPanel from '$lib/components/library/LibraryPanel.svelte';
-	import SaveAccountDialog from '$lib/components/library/SaveAccountDialog.svelte';
-	import StatsPanel from '$lib/components/library/StatsPanel.svelte';
-	import type { LibraryItem, SearchIssue } from '$lib/comics/types';
-	import { db } from '$lib/db';
+	import { id } from "@instantdb/svelte";
+	import { LoaderCircle } from "@lucide/svelte";
+	import { createSearchParamsSchema, useSearchParams } from "runed/kit";
+	import { goto } from "$app/navigation";
+	import AuthGate from "$lib/features/auth/AuthGate.svelte";
+	import ComicSearchPanel from "$lib/features/search/ComicSearchPanel.svelte";
+	import { ComicSearchState } from "$lib/features/search/comic-search-state.svelte";
+	import CreateListDialog from "$lib/features/lists/CreateListDialog.svelte";
+	import CollectionPanel from "$lib/features/main-page/CollectionPanel.svelte";
+	import ListsPanel from "$lib/features/main-page/ListsPanel.svelte";
+	import OverviewPanel from "$lib/features/main-page/OverviewPanel.svelte";
+	import {
+		validateListName,
+		type CustomListSummary,
+	} from "$lib/features/lists/lists";
+	import {
+		IssueListView,
+		isIssueListViewMode,
+		resolvedIssueListViewMode,
+		saveIssueListViewMode,
+		storedIssueListViewMode,
+	} from "$lib/features/issues/view-mode";
+	import {
+		IssueSort,
+		isAllowedIssueSortKey,
+		resolvedIssueSortKey,
+		saveIssueSortKey,
+		storedIssueSortKey,
+	} from "$lib/features/issues/sort";
+	import type {
+		CollectionItem,
+		SearchIssue,
+		UserIssuePatch,
+	} from "$lib/comics/types";
+	import { COLLECTION_NAME } from "$lib/collection";
+	import { db } from "$lib/db";
 
+	const COLLECTION_SORT_STORAGE_KEY = "longbox.collection.sort";
+	const COLLECTION_VIEW_STORAGE_KEY = "longbox.collection.view";
+	const collectionSearchParams = useSearchParams(
+		createSearchParamsSchema({
+			view: { type: "string", default: "" },
+			sort: { type: "string", default: "" },
+		}),
+		{ pushHistory: false, noScroll: true },
+	);
 	const auth = db.useAuth();
-	const library = db.useQuery(() =>
+	const collection = db.useQuery(() =>
 		auth.user
 			? {
-					userLists: {
+					userIssues: {
 						$: {
 							where: {
-								'owner.id': auth.user.id,
-								name: 'Library'
-							}
-						},
-						items: {
-							$: {
-								order: {
-									position: 'asc'
-								}
+								"owner.id": auth.user.id,
 							},
-							userIssue: {
-								issue: {
-									volume: {
-										publisher: {}
-									},
-									issueCharacters: {
-										character: {}
-									},
-									credits: {
-										person: {}
-									}
-								}
-							}
-						}
-					}
+						},
+						issue: {
+							volume: {
+								publisher: {},
+							},
+							issueCharacters: {
+								character: {},
+							},
+							credits: {
+								person: {},
+							},
+						},
+						listItems: {
+							list: {},
+						},
+					},
 				}
-			: null
+			: null,
 	);
 	const lists = db.useQuery(() =>
 		auth.user
@@ -50,85 +79,251 @@
 					userLists: {
 						$: {
 							where: {
-								'owner.id': auth.user.id
-							}
-						}
-					}
+								"owner.id": auth.user.id,
+							},
+						},
+						items: {
+							$: {
+								order: {
+									position: "asc",
+								},
+							},
+							userIssue: {
+								issue: {},
+							},
+						},
+					},
 				}
-			: null
+			: null,
 	);
-
-	let query = $state('');
-	let results = $state<SearchIssue[]>([]);
-	let searchError = $state<string | null>(null);
+	const comicSearch = new ComicSearchState();
 	let addError = $state<string | null>(null);
 	let authError = $state<string | null>(null);
-	let authEmail = $state('');
-	let authCode = $state('');
+	let authEmail = $state("");
+	let authCode = $state("");
 	let authCodeSent = $state(false);
-	let isSearching = $state(false);
 	let isSigningIn = $state(false);
 	let searchOpen = $state(false);
-	let saveAccountOpen = $state(false);
-	let saveAccountEmail = $state('');
-	let saveAccountCode = $state('');
-	let saveAccountCodeSent = $state(false);
-	let saveAccountError = $state<string | null>(null);
-	let isSavingAccount = $state(false);
 	let addingIssueIds = $state<number[]>([]);
-
-	let libraryItems = $derived(
-		((library.data?.userLists?.[0]?.items ?? []) as LibraryItem[]).filter(
-			(item) => item.userIssue?.issue
-		)
+	let createListOpen = $state(false);
+	let createListName = $state("");
+	let createListError = $state<string | null>(null);
+	let isCreatingList = $state(false);
+	let collectionActionError = $state<string | null>(null);
+	let removingCollectionIssueIds = $state<string[]>([]);
+	const collectionViewMode = $derived(
+		resolvedIssueListViewMode(
+			collectionSearchParams.view,
+			storedIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY),
+			IssueListView.Gallery,
+		),
 	);
-	let libraryComicVineIds = $derived(
+	const collectionSortKey = $derived(
+		resolvedIssueSortKey(
+			collectionSearchParams.sort,
+			storedIssueSortKey(COLLECTION_SORT_STORAGE_KEY, false),
+			IssueSort.NewestAdded,
+			false,
+		),
+	);
+
+	let collectionItems = $derived.by(() =>
+		(collection.data?.userIssues ?? [])
+			.filter((userIssue) => userIssue.issue)
+			.map((userIssue): CollectionItem => ({
+				id: userIssue.id,
+				userIssue,
+			})),
+	);
+	let collectionComicVineIds = $derived(
 		new Set(
-			libraryItems
+			collectionItems
 				.map((item) => item.userIssue?.issue?.comicVineId)
-				.filter((id): id is number => typeof id === 'number')
-		)
+				.filter((id): id is number => typeof id === "number"),
+		),
 	);
 	let favoriteCount = $derived(
-		libraryItems.filter((item) => item.userIssue?.favorite === true).length
+		collectionItems.filter((item) => item.userIssue?.favorite === true).length,
 	);
 	let watchlistCount = $derived(
-		libraryItems.filter((item) => item.userIssue?.readStatus === 'unread').length
+		collectionItems.filter((item) => item.userIssue?.readStatus === "unread")
+			.length,
 	);
 	let readCount = $derived(
-		libraryItems.filter((item) => item.userIssue?.readStatus === 'read').length
+		collectionItems.filter((item) => item.userIssue?.readStatus === "read")
+			.length,
 	);
-	let customListCount = $derived(
-		(lists.data?.userLists ?? []).filter((list) => list.name !== 'Library').length
-	);
+	let customLists = $derived.by(() => {
+		const userLists = lists.data?.userLists ?? [];
 
-	function isInLibrary(issue: SearchIssue) {
-		return libraryComicVineIds.has(issue.id);
+		return userLists
+			.filter((list) => list.name !== COLLECTION_NAME)
+			.sort(
+				(first, second) =>
+					first.createdAt.getTime() - second.createdAt.getTime(),
+			)
+			.map((list): CustomListSummary => ({
+				coverImageUrls: list.items
+					.map((item) => item.userIssue?.issue?.coverImageUrl)
+					.filter((url): url is string => Boolean(url))
+					.slice(0, 5),
+				createdAt: list.createdAt,
+				id: list.id,
+				issueCount: list.items.length,
+				name: list.name,
+				updatedAt: list.updatedAt,
+			}));
+	});
+
+	function isInCollection(issue: SearchIssue) {
+		return collectionComicVineIds.has(issue.id);
 	}
+
+	$effect(() => {
+		const viewMode = collectionSearchParams.view;
+		const sortKey = collectionSearchParams.sort;
+		const savedSortKey = storedIssueSortKey(COLLECTION_SORT_STORAGE_KEY, false);
+		const savedViewMode = storedIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY);
+
+		if (!viewMode && savedViewMode) {
+			collectionSearchParams.view = savedViewMode;
+		} else if (isIssueListViewMode(viewMode)) {
+			saveIssueListViewMode(COLLECTION_VIEW_STORAGE_KEY, viewMode);
+		}
+
+		if (!sortKey && savedSortKey) {
+			collectionSearchParams.sort = savedSortKey;
+		} else if (isAllowedIssueSortKey(sortKey, false)) {
+			saveIssueSortKey(COLLECTION_SORT_STORAGE_KEY, sortKey);
+		}
+	});
 
 	function openSearch() {
 		searchOpen = true;
 	}
 
-	function openSaveAccount() {
-		saveAccountError = null;
-		saveAccountOpen = true;
+	function openCreateList() {
+		if (createListOpen || isCreatingList) {
+			return;
+		}
+
+		createListName = "";
+		createListError = null;
+		createListOpen = true;
 	}
 
-	function backToSaveAccountEmail() {
-		saveAccountCode = '';
-		saveAccountCodeSent = false;
-		saveAccountError = null;
+	function closeCreateList() {
+		if (isCreatingList) {
+			return;
+		}
+
+		createListOpen = false;
+		createListName = "";
+		createListError = null;
+	}
+
+	async function createList() {
+		if (!auth.user || isCreatingList) {
+			return;
+		}
+
+		const trimmedName = createListName.trim();
+		const validationError = validateListName(
+			trimmedName,
+			customLists.map((list) => list.name),
+		);
+		createListError = validationError;
+
+		if (validationError) {
+			return;
+		}
+
+		isCreatingList = true;
+		const listId = id();
+		const now = new Date();
+
+		try {
+			await db.transact(
+				db.tx.userLists[listId]
+					.update({
+						createdAt: now,
+						listKey: `${auth.user.id}:custom:${listId}`,
+						name: trimmedName,
+						sortKey: IssueSort.Custom,
+						updatedAt: now,
+					})
+					.link({ owner: auth.user.id }),
+			);
+			createListOpen = false;
+			createListName = "";
+			await goto(`/list/${listId}`);
+		} catch (error) {
+			createListError =
+				error instanceof Error ? error.message : "Unable to create this list.";
+		} finally {
+			isCreatingList = false;
+		}
+	}
+
+	async function renameList(listId: string, name: string) {
+		await db.transact(
+			db.tx.userLists[listId].update({
+				name,
+				updatedAt: new Date(),
+			}),
+		);
+	}
+
+	async function removeCollectionIssue(itemId: string) {
+		if (removingCollectionIssueIds.includes(itemId)) return;
+
+		collectionActionError = null;
+		removingCollectionIssueIds = [...removingCollectionIssueIds, itemId];
+
+		try {
+			await db.transact(db.tx.userIssues[itemId].delete());
+		} catch (error) {
+			collectionActionError =
+				error instanceof Error ? error.message : "Unable to remove this issue.";
+			throw error;
+		} finally {
+			removingCollectionIssueIds = removingCollectionIssueIds.filter(
+				(id) => id !== itemId,
+			);
+		}
+	}
+
+	async function updateCollectionIssue(
+		userIssueId: string,
+		patch: UserIssuePatch,
+	) {
+		collectionActionError = null;
+
+		try {
+			await db.transact(
+				db.tx.userIssues[userIssueId].update({
+					...patch,
+					updatedAt: new Date(),
+				}),
+			);
+		} catch (error) {
+			collectionActionError =
+				error instanceof Error ? error.message : "Unable to update this issue.";
+		}
 	}
 
 	function backToAuthEmail() {
-		authCode = '';
+		authCode = "";
 		authCodeSent = false;
 		authError = null;
 	}
 
 	function handleGlobalKeydown(event: KeyboardEvent) {
-		if (!auth.user || event.defaultPrevented || event.key.toLowerCase() !== 'k') {
+		if (
+			!auth.user ||
+			event.defaultPrevented ||
+			event.key.toLowerCase() !== "k"
+		) {
 			return;
 		}
 
@@ -140,7 +335,10 @@
 
 	async function readJsonResponse(response: Response) {
 		try {
-			return (await response.json()) as { results?: SearchIssue[]; error?: string };
+			return (await response.json()) as {
+				results?: SearchIssue[];
+				error?: string;
+			};
 		} catch {
 			return {};
 		}
@@ -153,7 +351,7 @@
 		try {
 			await db.auth.signInAsGuest();
 		} catch (error) {
-			authError = error instanceof Error ? error.message : 'Unable to sign in.';
+			authError = error instanceof Error ? error.message : "Unable to sign in.";
 		} finally {
 			isSigningIn = false;
 		}
@@ -164,7 +362,7 @@
 		authError = null;
 
 		if (!trimmedEmail) {
-			authError = 'Enter an email address.';
+			authError = "Enter an email address.";
 			return;
 		}
 
@@ -173,10 +371,13 @@
 		try {
 			await db.auth.sendMagicCode({ email: trimmedEmail });
 			authEmail = trimmedEmail;
-			authCode = '';
+			authCode = "";
 			authCodeSent = true;
 		} catch (error) {
-			authError = error instanceof Error ? error.message : 'Unable to send a sign-in code.';
+			authError =
+				error instanceof Error
+					? error.message
+					: "Unable to send a sign-in code.";
 		} finally {
 			isSigningIn = false;
 		}
@@ -187,7 +388,7 @@
 		authError = null;
 
 		if (!trimmedCode) {
-			authError = 'Enter the code from your email.';
+			authError = "Enter the code from your email.";
 			return;
 		}
 
@@ -196,129 +397,51 @@
 		try {
 			await db.auth.signInWithMagicCode({
 				email: authEmail,
-				code: trimmedCode
+				code: trimmedCode,
 			});
-			authEmail = '';
-			authCode = '';
+			authEmail = "";
+			authCode = "";
 			authCodeSent = false;
 		} catch (error) {
-			authError = error instanceof Error ? error.message : 'Unable to sign in.';
-			authCode = '';
+			authError = error instanceof Error ? error.message : "Unable to sign in.";
+			authCode = "";
 		} finally {
 			isSigningIn = false;
 		}
 	}
 
-	async function sendSaveAccountCode() {
-		const trimmedEmail = saveAccountEmail.trim();
-		saveAccountError = null;
-
-		if (!trimmedEmail) {
-			saveAccountError = 'Enter an email address.';
-			return;
-		}
-
-		isSavingAccount = true;
-
-		try {
-			await db.auth.sendMagicCode({ email: trimmedEmail });
-			saveAccountEmail = trimmedEmail;
-			saveAccountCode = '';
-			saveAccountCodeSent = true;
-		} catch (error) {
-			saveAccountError = error instanceof Error ? error.message : 'Unable to send a sign-in code.';
-		} finally {
-			isSavingAccount = false;
-		}
-	}
-
-	async function saveGuestAccount() {
-		const trimmedCode = saveAccountCode.trim();
-		saveAccountError = null;
-
-		if (!trimmedCode) {
-			saveAccountError = 'Enter the code from your email.';
-			return;
-		}
-
-		isSavingAccount = true;
-
-		try {
-			await db.auth.signInWithMagicCode({
-				email: saveAccountEmail,
-				code: trimmedCode
-			});
-			saveAccountOpen = false;
-			saveAccountEmail = '';
-			saveAccountCode = '';
-			saveAccountCodeSent = false;
-		} catch (error) {
-			saveAccountError = error instanceof Error ? error.message : 'Unable to save this account.';
-			saveAccountCode = '';
-		} finally {
-			isSavingAccount = false;
-		}
-	}
-
-	async function searchIssues() {
-		const trimmed = query.trim();
-		searchError = null;
-		addError = null;
-
-		if (!trimmed) {
-			results = [];
-			searchError = 'Enter a comic title, issue, or volume.';
-			return;
-		}
-
-		isSearching = true;
-
-		try {
-			const response = await fetch(`/api/comicvine/search?q=${encodeURIComponent(trimmed)}`);
-			const body = await readJsonResponse(response);
-
-			if (!response.ok) {
-				throw new Error(body.error ?? 'Search failed.');
-			}
-
-			results = body.results ?? [];
-		} catch (error) {
-			searchError = error instanceof Error ? error.message : 'Search failed.';
-			results = [];
-		} finally {
-			isSearching = false;
-		}
-	}
-
 	async function addIssue(issue: SearchIssue) {
-		if (isInLibrary(issue)) {
-			return;
+		if (isInCollection(issue) || addingIssueIds.includes(issue.id)) {
+			return true;
 		}
 
 		if (!auth.user?.refresh_token) {
-			addError = 'Sign in before adding issues.';
-			return;
+			addError = "Sign in before adding issues.";
+			return false;
 		}
 
 		addError = null;
 		addingIssueIds = [...addingIssueIds, issue.id];
 
 		try {
-			const response = await fetch('/api/library/add', {
-				method: 'POST',
+			const response = await fetch("/api/collection/add", {
+				method: "POST",
 				headers: {
 					authorization: `Bearer ${auth.user.refresh_token}`,
-					'content-type': 'application/json'
+					"content-type": "application/json",
 				},
-				body: JSON.stringify({ issueId: issue.id })
+				body: JSON.stringify({ issueId: issue.id }),
 			});
 			const body = await readJsonResponse(response);
 
 			if (!response.ok) {
-				throw new Error(body.error ?? 'Unable to add issue.');
+				throw new Error(body.error ?? "Unable to add issue.");
 			}
+			return true;
 		} catch (error) {
-			addError = error instanceof Error ? error.message : 'Unable to add issue.';
+			addError =
+				error instanceof Error ? error.message : "Unable to add issue.";
+			return false;
 		} finally {
 			addingIssueIds = addingIssueIds.filter((id) => id !== issue.id);
 		}
@@ -331,20 +454,18 @@
 
 <svelte:document onkeydown={handleGlobalKeydown} />
 
-<main class="min-h-screen bg-background text-foreground">
-	<section class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
-		<AppHeader
-			isGuest={Boolean(auth.user?.isGuest)}
-			signedIn={Boolean(auth.user)}
-			onOpenSearch={openSearch}
-			onSaveAccount={openSaveAccount}
-			onSignOut={() => db.auth.signOut()}
-		/>
+<main>
+	<section
+		class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10"
+	>
+		<h1 class="sr-only">Longbox</h1>
 
 		{#if auth.isLoading}
-			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
+			<div
+				class="flex min-h-96 items-center justify-center text-muted-foreground"
+			>
 				<LoaderCircle class="mr-2 size-4 animate-spin" />
-				Loading library
+				Loading collection
 			</div>
 		{:else if !auth.user}
 			<AuthGate
@@ -363,42 +484,54 @@
 				{addError}
 				{addingIssueIds}
 				bind:open={searchOpen}
-				bind:query
-				{isInLibrary}
-				{isSearching}
+				{isInCollection}
 				onAddIssue={addIssue}
-				onSearch={searchIssues}
-				resultLimit={12}
-				{results}
-				{searchError}
+				search={comicSearch}
 			/>
 
-			{#if auth.user?.isGuest}
-				<SaveAccountDialog
-					bind:code={saveAccountCode}
-					bind:email={saveAccountEmail}
-					bind:open={saveAccountOpen}
-					codeSent={saveAccountCodeSent}
-					errorMessage={saveAccountError}
-					isSubmitting={isSavingAccount}
-					onBackToEmail={backToSaveAccountEmail}
-					onSubmitCode={saveGuestAccount}
-					onSubmitEmail={sendSaveAccountCode}
-				/>
-			{/if}
+			<CreateListDialog
+				errorMessage={createListError}
+				bind:name={createListName}
+				bind:open={createListOpen}
+				isSubmitting={isCreatingList}
+				onCancel={closeCreateList}
+				onSubmit={createList}
+			/>
 
-			<StatsPanel
+			<OverviewPanel
 				{favoriteCount}
-				issueCount={libraryItems.length}
-				listCount={customListCount}
+				issueCount={collectionItems.length}
+				listCount={customLists.length}
 				{readCount}
 				{watchlistCount}
 			/>
 
-			<LibraryPanel
-				errorMessage={library.error?.message ?? null}
-				isLoading={library.isLoading}
-				items={libraryItems}
+			<ListsPanel
+				{customLists}
+				errorMessage={lists.error?.message ?? null}
+				isLoading={lists.isLoading}
+				onCreateList={openCreateList}
+				onRenameList={renameList}
+			/>
+
+			<CollectionPanel
+				errorMessage={collectionActionError ??
+					collection.error?.message ??
+					null}
+				isLoading={collection.isLoading}
+				items={collectionItems}
+				onAddIssue={openSearch}
+				onRemoveIssue={removeCollectionIssue}
+				sortKey={collectionSortKey}
+				viewMode={collectionViewMode}
+				onSortKeyChange={(sortKey) => {
+					collectionSearchParams.sort = sortKey;
+				}}
+				onUpdateUserIssue={updateCollectionIssue}
+				onViewModeChange={(viewMode) => {
+					collectionSearchParams.view = viewMode;
+				}}
+				removingItemIds={removingCollectionIssueIds}
 			/>
 		{/if}
 	</section>

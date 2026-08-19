@@ -1,4 +1,4 @@
-import type { LibraryItem, SearchIssue } from './types';
+import type { CollectionItem, SearchIssue } from './types';
 
 export function issueTitle(issue: SearchIssue) {
 	const volumeName = issue.volume.name ?? 'Unknown volume';
@@ -18,7 +18,7 @@ export function formatDate(date: string | Date | null | undefined) {
 	}).format(value);
 }
 
-export function groupedCredits(item: LibraryItem) {
+export function groupedCredits(item: CollectionItem) {
 	const credits = item.userIssue?.issue?.credits ?? [];
 	const byRole: Record<string, string[]> = {};
 
@@ -55,7 +55,7 @@ function linkedName(value: { name: string } | Array<{ name: string }> | null | u
 	return record?.name;
 }
 
-export function characterNames(item: LibraryItem) {
+export function characterNames(item: CollectionItem) {
 	const linkedNames = Array.from(
 		new Set(
 			(item.userIssue?.issue?.issueCharacters ?? [])

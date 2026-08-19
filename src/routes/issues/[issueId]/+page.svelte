@@ -1,28 +1,39 @@
 <script lang="ts">
 	import {
+		BookX,
 		BookOpen,
 		BookOpenCheck,
 		CalendarIcon,
 		ArrowLeft,
 		CheckCircle2,
+		CircleAlert,
 		Heart,
 		HeartOff,
+		House,
 		LoaderCircle,
 		Package,
 		PackageCheck,
-		Star
+		RefreshCcw
 	} from '@lucide/svelte';
 	import { CalendarDate, DateFormatter, getLocalTimeZone, type DateValue } from '@internationalized/date';
+	import { flushSync } from 'svelte';
 	import type { PageProps } from './$types';
+	import * as Alert from '$lib/components/ui/alert';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
+	import * as Empty from '$lib/components/ui/empty';
 	import { Input } from '$lib/components/ui/input';
 	import * as Popover from '$lib/components/ui/popover';
+	import * as StarRating from '$lib/components/ui/star-rating';
 	import { Toggle } from '$lib/components/ui/toggle';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
 	import { formatDate } from '$lib/comics/format';
-	import type { LibraryIssue } from '$lib/comics/types';
-	import { issueViewTransitionName } from '$lib/comics/view-transitions';
+	import type { CollectionIssue } from '$lib/comics/types';
+	import {
+		getIssueTransitionPreview,
+		isActiveIssueTransition,
+		issueViewTransitionName,
+		primeIssueTransition
+	} from '$lib/comics/view-transitions.svelte';
 	import { db } from '$lib/db';
 
 	type DetailUserIssue = {
@@ -34,7 +45,7 @@
 		readStatus: string;
 		updatedAt: Date;
 		userNote?: string | null;
-		issue?: LibraryIssue | null;
+		issue?: CollectionIssue | null;
 	};
 
 	type SaveStatus = 'saved' | 'saving' | 'dirty' | 'error';
@@ -42,7 +53,7 @@
 		acquiredAt: string;
 		favorite: boolean;
 		owned: boolean;
-		rating: number | null;
+		rating: number;
 		readStatus: 'read' | 'unread';
 		userNote: string;
 	};
@@ -91,21 +102,26 @@
 	let saveError = $state<string | null>(null);
 	let noteInput = $state<HTMLInputElement | null>(null);
 	let activeUserIssueId: string | null = null;
-	let saveTimeout: ReturnType<typeof window.setTimeout> | null = null;
+	let saveTimeout: number | null = null;
 	let saveRequestId = 0;
 
 	const userIssue = $derived(
 		(userIssueQuery.data?.userIssues?.[0] as DetailUserIssue | undefined) ?? null
 	);
-	const issue = $derived((issueQuery.data?.issues?.[0] as LibraryIssue | undefined) ?? null);
-	const title = $derived(issue ? issueTitle(issue) : 'Issue details');
+	const issue = $derived((issueQuery.data?.issues?.[0] as CollectionIssue | undefined) ?? null);
+	const transitionPreview = $derived(getIssueTransitionPreview(params.issueId));
+	const title = $derived(issue ? issueTitle(issue) : (transitionPreview?.title ?? 'Issue details'));
+	const coverImageUrl = $derived(issue?.coverImageUrl ?? transitionPreview?.coverImageUrl ?? null);
+	const coverInViewTransition = $derived(
+		isActiveIssueTransition(params.issueId) && transitionPreview?.hasSharedCover === true
+	);
+	const returnHref = $derived(transitionPreview?.sourceHref ?? '/');
+	const returnLabel = $derived(transitionPreview?.sourceLabel ?? 'Collection');
 	const credits = $derived(groupCredits(issue));
 	const characters = $derived(characterNames(issue));
 	const details = $derived(detailRows(issue));
 	const noteStatus = $derived(statusText(saveStatus));
 	const acquiredDateValue = $derived(calendarDateFromInput(draft.acquiredAt));
-	const ratingValue = $derived(draft.rating ? String(draft.rating) : '');
-
 	const dateFormatter = new DateFormatter('en-US', {
 		dateStyle: 'medium'
 	});
@@ -136,7 +152,7 @@
 			acquiredAt: '',
 			favorite: false,
 			owned: false,
-			rating: null,
+			rating: 0,
 			readStatus: 'unread',
 			userNote: ''
 		};
@@ -151,7 +167,7 @@
 			acquiredAt: dateInputValue(userIssueValue.acquiredAt),
 			favorite: userIssueValue.favorite,
 			owned: userIssueValue.owned,
-			rating: userIssueValue.rating ?? null,
+			rating: userIssueValue.rating ?? 0,
 			readStatus: userIssueValue.readStatus === 'read' ? 'read' : 'unread',
 			userNote: userIssueValue.userNote ?? ''
 		};
@@ -289,8 +305,8 @@
 		updateDraft({ favorite: checked });
 	}
 
-	function setRatingValue(value: string) {
-		updateDraft({ rating: value ? Number(value) : null });
+	function setRating(rating: number) {
+		updateDraft({ rating });
 	}
 
 	function cancelNoteEdit() {
@@ -310,7 +326,13 @@
 		}
 	}
 
-	function issueTitle(issueValue: LibraryIssue) {
+	function prepareIssueTransition() {
+		if (issue) {
+			flushSync(() => primeIssueTransition(issue));
+		}
+	}
+
+	function issueTitle(issueValue: CollectionIssue) {
 		const volumeName = issueValue.volume?.name ?? 'Unknown volume';
 		const issueName = issueValue.name ? `: ${issueValue.name}` : '';
 		return `${volumeName} #${issueValue.issueNumber}${issueName}`;
@@ -321,7 +343,7 @@
 		return record?.name;
 	}
 
-	function characterNames(issueValue: LibraryIssue | null) {
+	function characterNames(issueValue: CollectionIssue | null) {
 		return Array.from(
 			new Set(
 				(issueValue?.issueCharacters ?? [])
@@ -331,7 +353,7 @@
 		);
 	}
 
-	function groupCredits(issueValue: LibraryIssue | null) {
+	function groupCredits(issueValue: CollectionIssue | null) {
 		const byRole: Record<string, string[]> = {};
 
 		for (const credit of issueValue?.credits ?? []) {
@@ -347,7 +369,7 @@
 		}));
 	}
 
-	function detailRows(issueValue: LibraryIssue | null) {
+	function detailRows(issueValue: CollectionIssue | null) {
 		if (!issueValue) {
 			return [];
 		}
@@ -373,53 +395,97 @@
 	<title>{title} | Longbox</title>
 </svelte:head>
 
-<main class="min-h-screen bg-background text-foreground">
+<main>
 	<section class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
 		<div>
-			<Button href="/" variant="ghost" class="mb-4 -ml-2">
+			<Button
+				href={returnHref}
+				variant="ghost"
+				class="mb-4 -ml-2"
+				onpointerdown={prepareIssueTransition}
+				onclick={prepareIssueTransition}
+			>
 				<ArrowLeft data-icon="inline-start" />
-				Library
+				{returnLabel}
 			</Button>
 		</div>
 
-		{#if issueQuery.isLoading}
+		{#if issueQuery.error}
+			<Empty.Root class="min-h-96 border" aria-labelledby="issue-load-error-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<CircleAlert aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h1 id="issue-load-error-title">Couldn’t load this issue</h1>
+					</Empty.Title>
+					<Empty.Description>Check your connection and try again.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content class="sm:flex-row">
+					<Button onclick={() => window.location.reload()}>
+						<RefreshCcw data-icon="inline-start" />
+						Reload page
+					</Button>
+					<Button href="/" variant="outline">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
+		{:else if issueQuery.isLoading && !transitionPreview}
 			<div class="flex min-h-96 items-center justify-center text-muted-foreground">
 				<LoaderCircle class="mr-2 size-4 animate-spin" />
 				Loading issue
 			</div>
-		{:else if issueQuery.error}
-			<section class="rounded-lg border border-border bg-card p-6">
-				<h1 class="text-2xl font-semibold">Unable to load issue</h1>
-				<p class="mt-2 text-sm leading-6 text-destructive">{issueQuery.error.message}</p>
-			</section>
-		{:else if !issue}
-			<section class="rounded-lg border border-border bg-card p-6">
-				<h1 class="text-2xl font-semibold">Issue not found</h1>
-				<p class="mt-2 text-sm leading-6 text-muted-foreground">
-					This issue is not available in the local catalog.
-				</p>
-			</section>
+		{:else if !issue && !transitionPreview}
+			<Empty.Root class="min-h-96 border" aria-labelledby="issue-not-found-title">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<BookX aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>
+						<h1 id="issue-not-found-title">Issue not found</h1>
+					</Empty.Title>
+					<Empty.Description>This issue is not available in the local catalog.</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button href="/">
+						<House data-icon="inline-start" />
+						Collection
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
 		{:else}
 			<div class="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
 				<aside class="space-y-4">
 					<img
-						class="aspect-[2/3] w-full rounded-lg border border-border object-cover"
-						src={issue.coverImageUrl ?? '/robots.txt'}
+						class="aspect-[2/3] w-full border border-border object-cover"
+						src={coverImageUrl ?? '/robots.txt'}
 						alt=""
-						style:view-transition-name={issueViewTransitionName(issue.id, 'cover')}
+						style:view-transition-name={coverInViewTransition
+							? issueViewTransitionName(params.issueId, 'cover')
+							: null}
+						style:view-transition-class={coverInViewTransition ? 'issue-cover' : null}
 					/>
 
-					{#if auth.isLoading}
+					{#if !issue}
 						<section class="rounded-lg border border-border bg-card p-4">
 							<div class="flex items-center text-sm text-muted-foreground">
 								<LoaderCircle class="mr-2 size-4 animate-spin" />
-								Loading library fields
+								Loading issue
+							</div>
+						</section>
+					{:else if auth.isLoading}
+						<section class="rounded-lg border border-border bg-card p-4">
+							<div class="flex items-center text-sm text-muted-foreground">
+								<LoaderCircle class="mr-2 size-4 animate-spin" />
+								Loading collection fields
 							</div>
 						</section>
 					{:else if auth.user}
 						<section class="rounded-lg border border-border bg-card p-4">
 							<div class="flex flex-wrap items-center justify-between gap-3">
-								<h2 class="font-semibold">My library</h2>
+								<h2 class="font-semibold">My collection</h2>
 								<div class="flex items-center gap-2 text-sm text-muted-foreground">
 									{#if saveStatus === 'saving'}
 										<LoaderCircle class="size-4 animate-spin" />
@@ -436,7 +502,11 @@
 									Loading saved issue
 								</div>
 							{:else if userIssueQuery.error}
-								<p class="mt-3 text-sm text-destructive">{userIssueQuery.error.message}</p>
+								<Alert.Root class="mt-3" variant="destructive">
+									<CircleAlert aria-hidden="true" />
+									<Alert.Title>Couldn’t load collection details</Alert.Title>
+									<Alert.Description>Check your connection and reload the page.</Alert.Description>
+								</Alert.Root>
 							{:else if userIssue}
 								<div class="mt-3 space-y-3">
 									<div class="grid grid-cols-3 gap-2">
@@ -488,36 +558,18 @@
 
 									<div>
 										<p class="text-xs font-semibold text-muted-foreground uppercase">Rating</p>
-										<div class="mt-2 flex flex-wrap items-center gap-2">
-											<ToggleGroup.Root
-												type="single"
-												value={ratingValue}
-												onValueChange={setRatingValue}
-												size="sm"
-												spacing={1}
+										<div class="mt-2 flex items-center gap-2">
+											<StarRating.Root
+												value={draft.rating}
 												aria-label="Issue rating"
+												onValueChange={setRating}
 											>
-											{#each [1, 2, 3, 4, 5] as rating (rating)}
-													<ToggleGroup.Item
-														value={String(rating)}
-														class="text-muted-foreground data-[state=on]:bg-transparent data-[state=on]:text-amber-500 data-[state=on]:*:[svg]:fill-amber-400 data-[state=on]:*:[svg]:stroke-amber-500"
-													aria-label={draft.rating === rating
-														? `Clear ${rating} star rating`
-														: `Set rating to ${rating} ${rating === 1 ? 'star' : 'stars'}`}
-												>
-													<Star
-														class={`size-5 ${
-															draft.rating && rating <= draft.rating
-																? 'fill-amber-400 text-amber-500'
-																: ''
-														}`}
-													/>
-													</ToggleGroup.Item>
-											{/each}
-											</ToggleGroup.Root>
-											<span class="ml-1 text-sm text-muted-foreground">
-												{draft.rating ? `${draft.rating}/5` : 'Unrated'}
-											</span>
+												{#snippet children({ items })}
+													{#each items as item (item.index)}
+														<StarRating.Star {...item} />
+													{/each}
+												{/snippet}
+											</StarRating.Root>
 										</div>
 									</div>
 
@@ -594,11 +646,15 @@
 								</div>
 
 								{#if saveError}
-									<p class="mt-3 text-sm text-destructive">{saveError}</p>
+									<Alert.Root class="mt-3" variant="destructive">
+										<CircleAlert aria-hidden="true" />
+										<Alert.Title>Couldn’t save changes</Alert.Title>
+										<Alert.Description>{saveError}</Alert.Description>
+									</Alert.Root>
 								{/if}
 							{:else}
 								<p class="mt-3 text-sm leading-6 text-muted-foreground">
-									This issue is not saved in your library.
+									This issue is not saved in your collection.
 								</p>
 							{/if}
 						</section>
@@ -608,64 +664,67 @@
 				<div class="min-w-0 space-y-6">
 					<header>
 						<p class="text-sm font-medium text-muted-foreground">
-							{issue.volume?.publisher?.name ?? 'Unknown publisher'}
+							{issue?.volume?.publisher?.name ?? 'Unknown publisher'}
 						</p>
-						<h1
-							class="mt-2 text-3xl font-semibold tracking-normal text-balance"
-							style:view-transition-name={issueViewTransitionName(issue.id, 'title')}
-						>
+						<h1 class="mt-2 text-3xl font-semibold tracking-normal text-balance">
 							{title}
 						</h1>
 						<p class="mt-2 text-sm text-muted-foreground">
-							{formatDate(issue.coverDate)} · {issue.volume?.name ?? 'Unknown volume'}
+							{#if issue}
+								{formatDate(issue.coverDate)} · {issue.volume?.name ?? 'Unknown volume'}
+							{:else}
+								Loading issue
+							{/if}
 						</p>
 					</header>
 
-					<section class="rounded-lg border border-border bg-card p-4">
-						<h2 class="font-semibold">Details</h2>
-						<dl class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-							{#each details as [label, value] (label)}
-								<div>
-									<dt class="text-xs font-semibold text-muted-foreground uppercase">{label}</dt>
-									<dd class="mt-1 text-sm">{value}</dd>
-								</div>
-							{/each}
-						</dl>
-					</section>
-
-					{#if issue.summary || issue.descriptionHtml}
+					{#if issue}
 						<section class="rounded-lg border border-border bg-card p-4">
-							<h2 class="font-semibold">Description</h2>
-							{#if issue.summary}
-								<p class="mt-3 text-sm leading-6 text-muted-foreground">{issue.summary}</p>
-							{/if}
-							{#if issue.descriptionHtml}
-								<div class="prose prose-sm mt-4 max-w-none text-foreground">
-									{@html issue.descriptionHtml}
-								</div>
-							{/if}
+							<h2 class="font-semibold">Details</h2>
+							<dl class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+								{#each details as [label, value] (label)}
+									<div>
+										<dt class="text-xs font-semibold text-muted-foreground uppercase">{label}</dt>
+										<dd class="mt-1 text-sm">{value}</dd>
+									</div>
+								{/each}
+							</dl>
+						</section>
+
+						{#if issue.summary || issue.descriptionHtml}
+							<section class="rounded-lg border border-border bg-card p-4">
+								<h2 class="font-semibold">Description</h2>
+								{#if issue.summary}
+									<p class="mt-3 text-sm leading-6 text-muted-foreground">{issue.summary}</p>
+								{/if}
+								{#if issue.descriptionHtml}
+									<div class="prose prose-sm mt-4 max-w-none text-foreground">
+										{@html issue.descriptionHtml}
+									</div>
+								{/if}
+							</section>
+						{/if}
+
+						<section class="grid gap-6 md:grid-cols-2">
+							<div class="rounded-lg border border-border bg-card p-4">
+								<h2 class="font-semibold">Characters</h2>
+								<p class="mt-3 text-sm leading-6">
+									{characters.join(', ') || 'No character credits'}
+								</p>
+							</div>
+
+							<div class="rounded-lg border border-border bg-card p-4">
+								<h2 class="font-semibold">Credits</h2>
+								<ul class="mt-3 space-y-2 text-sm leading-6">
+									{#each credits as credit (credit.role)}
+										<li><span class="font-medium">{credit.role}:</span> {credit.names}</li>
+									{:else}
+										<li>No creator credits</li>
+									{/each}
+								</ul>
+							</div>
 						</section>
 					{/if}
-
-					<section class="grid gap-6 md:grid-cols-2">
-						<div class="rounded-lg border border-border bg-card p-4">
-							<h2 class="font-semibold">Characters</h2>
-							<p class="mt-3 text-sm leading-6">
-								{characters.join(', ') || 'No character credits'}
-							</p>
-						</div>
-
-						<div class="rounded-lg border border-border bg-card p-4">
-							<h2 class="font-semibold">Credits</h2>
-							<ul class="mt-3 space-y-2 text-sm leading-6">
-								{#each credits as credit (credit.role)}
-									<li><span class="font-medium">{credit.role}:</span> {credit.names}</li>
-								{:else}
-									<li>No creator credits</li>
-								{/each}
-							</ul>
-						</div>
-					</section>
 				</div>
 			</div>
 		{/if}

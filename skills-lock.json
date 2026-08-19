@@ -1,0 +1,29 @@
+{
+	"version": 1,
+	"skills": {
+		"fallow": {
+			"source": "fallow-rs/fallow-skills",
+			"sourceType": "github",
+			"skillPath": "fallow/skills/fallow/SKILL.md",
+			"computedHash": "1e4c70954d54585ba3af37e3864c493af6f48b2c434fb4a22af1ae814fc8c660"
+		},
+		"instantdb": {
+			"source": "instantdb/skills",
+			"sourceType": "github",
+			"skillPath": "skills/instantdb/SKILL.md",
+			"computedHash": "dde751fe7baf02ad41f01fd9c161043a1b140093fada936a6a1adbe34a777efd"
+		},
+		"shadcn-svelte": {
+			"source": "huntabyte/shadcn-svelte",
+			"sourceType": "github",
+			"skillPath": "skills/shadcn-svelte/SKILL.md",
+			"computedHash": "e2cc56b65eb0c28042934ec7d7b253e842b6e22456917276d53a0c71266303e7"
+		},
+		"svelte-code-writer": {
+			"source": "sveltejs/ai-tools",
+			"sourceType": "github",
+			"skillPath": "plugins/claude/svelte/skills/svelte-code-writer/SKILL.md",
+			"computedHash": "c0e2cce9855f8e312cbb0a05aef164b4659c672d7723e4e598ffa6bc94890542"
+		}
+	}
+}

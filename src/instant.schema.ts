@@ -25,7 +25,6 @@ const _schema = i.schema({
 		profiles: i.entity({
 			createdAt: i.date(),
 			name: i.string().optional(),
-			profileImageUrl: i.string().optional(),
 			updatedAt: i.date()
 		}),
 
@@ -81,7 +80,7 @@ const _schema = i.schema({
 		}),
 		issueGenres: i.entity({}),
 
-		// User library
+		// User collection
 		userIssues: i.entity({
 			acquiredAt: i.date().optional(),
 			createdAt: i.date(),
@@ -97,6 +96,7 @@ const _schema = i.schema({
 			createdAt: i.date(),
 			listKey: i.string().unique().indexed(),
 			name: i.string().indexed(),
+			sortKey: i.string().optional(),
 			updatedAt: i.date()
 		}),
 		userListItems: i.entity({
@@ -253,7 +253,7 @@ const _schema = i.schema({
 			}
 		},
 
-		// User library links
+		// User collection links
 		$usersUserIssues: {
 			forward: {
 				on: '$users',

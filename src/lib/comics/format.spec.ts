@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { characterNames } from './format';
-import type { LibraryItem } from './types';
+import type { CollectionItem } from './types';
 
 describe('comic display formatters', () => {
 	it('falls back to stored ComicVine character credits when joins are empty', () => {
-		const item: LibraryItem = {
+		const item: CollectionItem = {
 			id: 'list-item-1',
 			position: 0,
 			userIssue: {
@@ -43,7 +43,7 @@ describe('comic display formatters', () => {
 	});
 
 	it('prefers normalized linked characters over raw ComicVine payloads', () => {
-		const item: LibraryItem = {
+		const item: CollectionItem = {
 			id: 'list-item-1',
 			position: 0,
 			userIssue: {
@@ -71,7 +71,7 @@ describe('comic display formatters', () => {
 	});
 
 	it('reads linked character records when Instant returns one links as arrays', () => {
-		const item: LibraryItem = {
+		const item: CollectionItem = {
 			id: 'list-item-1',
 			position: 0,
 			userIssue: {

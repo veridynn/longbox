@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 
-const LIBRARY_NAME = 'Library';
 const UUID_NAMESPACE = '7c885f68-d620-4f24-8a38-65cf9b0f9427';
 
 function keyPart(value: string | number) {
@@ -11,20 +10,8 @@ function keyPart(value: string | number) {
 		.replace(/(^-|-$)/g, '');
 }
 
-export function libraryName() {
-	return LIBRARY_NAME;
-}
-
-export function listKey(ownerId: string) {
-	return `${ownerId}:library`;
-}
-
 export function userIssueKey(ownerId: string, issueComicVineId: number) {
 	return `${ownerId}:comicvine:${issueComicVineId}`;
-}
-
-export function listItemKey(ownerId: string, issueComicVineId: number) {
-	return `${listKey(ownerId)}:comicvine:${issueComicVineId}`;
 }
 
 export function creditKey(issueComicVineId: number, personComicVineId: number, role: string) {

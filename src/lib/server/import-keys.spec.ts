@@ -1,18 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import {
-	creditKey,
-	issueCharacterKey,
-	listItemKey,
-	listKey,
-	recordIdForKey,
-	userIssueKey
-} from './import-keys';
+import { creditKey, issueCharacterKey, recordIdForKey, userIssueKey } from './import-keys';
 
 describe('import keys', () => {
-	it('creates stable per-user library keys', () => {
-		expect(listKey('user-1')).toBe('user-1:library');
+	it('creates stable per-user issue keys', () => {
 		expect(userIssueKey('user-1', 123)).toBe('user-1:comicvine:123');
-		expect(listItemKey('user-1', 123)).toBe('user-1:library:comicvine:123');
 	});
 
 	it('creates normalized credit and character keys', () => {
@@ -22,10 +13,13 @@ describe('import keys', () => {
 	});
 
 	it('creates deterministic UUID record ids', () => {
-		expect(recordIdForKey('user-1:library')).toMatch(
+		const key = userIssueKey('user-1', 123);
+		const otherKey = userIssueKey('user-2', 123);
+
+		expect(recordIdForKey(key)).toMatch(
 			/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 		);
-		expect(recordIdForKey('user-1:library')).toBe(recordIdForKey('user-1:library'));
-		expect(recordIdForKey('user-1:library')).not.toBe(recordIdForKey('user-2:library'));
+		expect(recordIdForKey(key)).toBe(recordIdForKey(key));
+		expect(recordIdForKey(key)).not.toBe(recordIdForKey(otherKey));
 	});
 });

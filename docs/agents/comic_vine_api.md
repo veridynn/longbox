@@ -93,14 +93,39 @@ fetching details.
 
 Current implementation lives in `src/lib/server/comicvine.ts`.
 
-Search:
+Volume search:
+
+```text
+GET /volumes/
+  filter=name:<series title>
+  limit=100
+  field_list=id,name,start_year,count_of_issues,image,publisher
+```
+
+Issue search/browse:
+
+```text
+GET /issues/
+  filter=volume:<volume ids>[,issue_number:<exact issue number>]
+  sort=issue_number:asc
+  field_list=id,name,issue_number,cover_date,image,volume,site_detail_url
+```
+
+Facet suggestions:
 
 ```text
 GET /search/
-  query=<search text>
-  resources=issue
-  limit=12
-  field_list=id,name,issue_number,cover_date,image,volume,api_detail_url,site_detail_url
+  resources=character|publisher
+  query=<name>
+  limit=8
+  field_list=id,name,publisher
+```
+
+Character facet resolution:
+
+```text
+GET /character/4005-{characterId}/
+  field_list=publisher,issue_credits
 ```
 
 Issue detail:
@@ -170,14 +195,21 @@ medium_url -> small_url -> thumb_url -> icon_url
 
 ## Search Notes
 
-`/search/` is useful for broad user-entered text, but it is not precise enough
-for deterministic import decisions by itself. Prefer this flow:
+`/search/` is only a fallback when `/volumes/` returns no normalized title
+matches. Prefer this flow:
 
-1. Search issues by user query.
-2. Show enough context for user choice: volume name, issue number, title, cover
-   date, and cover image.
-3. Import by selected numeric issue id.
-4. Fetch issue detail and then volume detail server-side.
+1. Search and rank volumes by title, then start year.
+2. Browse the selected volume or filter matching volumes by exact issue number.
+3. Show volume year, publisher, issue number, title, cover date, and cover image.
+4. Import by selected numeric issue id.
+5. Fetch issue detail and then volume detail server-side.
+
+Faceted Add Comics search intersects selected characters' `issue_credits`, then
+derives matching runs from a bounded page of those issue ids. Do not rely on
+character `volume_credits`; Comic Vine may return an incomplete list even for
+major characters. Publisher is a refinement only: the documented `/volumes/`
+resource cannot filter by `publisher` or sort by `start_year`, so
+publisher-only discovery requires a future index or bounded scan.
 
 For exact volume/issue workflows, consider `/issues/` with filters only after
 verifying the relevant fields are documented as filterable and the behavior is
@@ -203,7 +235,7 @@ When expanding imports or background sync:
 - Cache by endpoint, id, field list, and relevant query parameters.
 - Reuse existing InstantDB catalog records when `dateLastSynced` is fresh
   enough for the feature.
-- Prefer user-triggered imports over automatic full-library scraping unless a
+- Prefer user-triggered imports over automatic full-collection scraping unless a
   clear cache/throttle plan exists.
 
 ## Attribution
